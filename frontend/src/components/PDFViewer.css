@@ -1,0 +1,97 @@
+.pdf-viewer-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #525659;
+  overflow: hidden;
+}
+
+.pdf-toolbar {
+  background-color: #2c2c2c;
+  color: white;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pdf-toolbar button {
+  background-color: #444;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.pdf-toolbar button:hover:not(:disabled) {
+  background-color: #555;
+}
+
+.pdf-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-info, .zoom-info {
+  font-size: 0.875rem;
+  min-width: 100px;
+  text-align: center;
+}
+
+.pdf-canvas-container {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem;
+  position: relative;
+  z-index: 1;
+}
+
+.loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.25rem;
+  color: #ccc;
+}
+
+/* React-PDF styles */
+.react-pdf__Document {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.react-pdf__Page {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  background: white;
+  margin: 0 auto;
+}
+
+.react-pdf__Page__canvas {
+  display: block;
+}
+
+/* Hide text layer and annotation layer for now */
+.react-pdf__Page__textContent,
+.react-pdf__Page__annotations {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+}

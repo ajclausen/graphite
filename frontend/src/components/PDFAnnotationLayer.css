@@ -1,0 +1,162 @@
+.pdf-annotation-layer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background-color: #525659;
+}
+
+.toolbar {
+  background-color: #2c2c2c;
+  color: white;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  z-index: 1001;
+  position: relative;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.toolbar button {
+  background-color: #444;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.toolbar button:hover:not(:disabled) {
+  background-color: #555;
+}
+
+.toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar button.active {
+  background-color: #007bff;
+}
+
+.page-info, .zoom-info {
+  font-size: 0.875rem;
+  min-width: 80px;
+  text-align: center;
+}
+
+.pdf-scroll-container {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pdf-page-container {
+  position: relative;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  display: inline-block;
+  background: white;
+}
+
+.annotation-overlay {
+  pointer-events: auto;
+  z-index: 1000;
+}
+
+/* Make Excalidraw fill viewport but keep transparent */
+.annotation-overlay .excalidraw {
+  width: 100vw !important;
+  height: 100vh !important;
+  background: transparent !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+}
+
+/* Ensure the actual drawing canvas is transparent */
+.annotation-overlay .excalidraw canvas {
+  background: transparent !important;
+}
+
+/* Remove blur and just use solid backgrounds for UI elements */
+.annotation-overlay .excalidraw .App-menu {
+  background: rgba(255, 255, 255, 0.98) !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+}
+
+.annotation-overlay .excalidraw .App-toolbar {
+  background: rgba(255, 255, 255, 0.98) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.annotation-overlay .excalidraw .layer-ui__wrapper {
+  background: transparent !important;
+}
+
+/* Hide the canvas background but keep the drawing area */
+.annotation-overlay .excalidraw .excalidraw__canvas {
+  background: transparent !important;
+}
+
+.annotation-overlay .excalidraw .App-canvas {
+  background: transparent !important;
+}
+
+/* Hide Excalidraw UI elements that overlap */
+.annotation-overlay .Island {
+  opacity: 0.9;
+  backdrop-filter: blur(4px);
+}
+
+/* Ensure scrollbars work properly */
+.annotation-overlay .excalidraw > div:first-child {
+  overflow: hidden !important;
+}
+
+/* PDF page styling */
+.react-pdf__Page {
+  background: white;
+  user-select: none;
+  position: relative !important;
+}
+
+/* Keep PDF at full opacity when annotating */
+.pdf-page-container.annotating .react-pdf__Page {
+  opacity: 1;
+}
+
+.react-pdf__Page canvas {
+  display: block;
+  max-width: none !important;
+}
+
+/* Ensure text and annotation layers align properly */
+.react-pdf__Page__textContent,
+.react-pdf__Page__annotations {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
+
+.loading {
+  padding: 2rem;
+  color: #ccc;
+  font-size: 1.25rem;
+}

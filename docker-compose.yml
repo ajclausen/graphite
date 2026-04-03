@@ -1,0 +1,20 @@
+services:
+  graphite:
+    build: .
+    # To use a pre-built image instead, comment out 'build' and uncomment 'image':
+    # image: ghcr.io/ajclausen/graphite:latest
+    ports:
+      - "${GRAPHITE_PORT:-3000}:3000"
+    volumes:
+      - graphite-data:/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATA_DIR=/data
+      - SESSION_SECRET=${SESSION_SECRET:?Set SESSION_SECRET in .env or shell (openssl rand -hex 32)}
+      # Set to '1' when running behind a reverse proxy (nginx, Caddy, Traefik)
+      # - TRUST_PROXY=1
+    restart: unless-stopped
+
+volumes:
+  graphite-data:

@@ -1,0 +1,126 @@
+:root {
+  /* Dark Graphite palette (default) */
+  --g-bg: #1B1D21;
+  --g-bg-elevated: #1F2125;
+  --g-surface: #24272C;
+  --g-surface-hover: #2E3238;
+  --g-surface-active: #353A40;
+  --g-charcoal: #16181B;
+  --g-charcoal-light: #2E3238;
+  --g-text: #E8E9EB;
+  --g-text-secondary: #8B8F96;
+  --g-text-tertiary: #5C6068;
+  --g-border: rgba(255, 255, 255, 0.07);
+  --g-border-light: rgba(255, 255, 255, 0.04);
+  --g-amber: #D4922A;
+  --g-amber-hover: #BF8224;
+  --g-amber-glow: rgba(212, 146, 42, 0.12);
+  --g-danger: #E8766A;
+  --g-danger-bg: rgba(232, 118, 106, 0.1);
+  --g-success: #7BAF8B;
+
+  --g-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --g-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.25);
+  --g-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.35);
+  --g-shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.3);
+
+  /* Toolbar chrome (dark) */
+  --g-toolbar-btn: rgba(255, 255, 255, 0.06);
+  --g-toolbar-btn-hover: rgba(255, 255, 255, 0.1);
+  --g-toolbar-btn-active: rgba(255, 255, 255, 0.12);
+  --g-toolbar-text: rgba(255, 255, 255, 0.55);
+  --g-toolbar-text-hover: #ffffff;
+  --g-toolbar-divider: rgba(255, 255, 255, 0.12);
+  --g-toolbar-gradient: rgba(255, 255, 255, 0.015);
+  --g-card-menu-bg: rgba(36, 39, 44, 0.85);
+  --g-overlay-bg: rgba(0, 0, 0, 0.55);
+
+  --g-radius: 10px;
+  --g-radius-lg: 14px;
+
+  --g-font-display: 'Instrument Serif', Georgia, serif;
+  --g-font-body: 'Outfit', system-ui, -apple-system, sans-serif;
+
+  font-family: var(--g-font-body);
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--g-text);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Light theme ── */
+
+[data-theme="light"] {
+  --g-bg: #F5F0E8;
+  --g-bg-elevated: #FAF7F2;
+  --g-surface: #FFFFFF;
+  --g-surface-hover: #F0EBE3;
+  --g-surface-active: #E8E2D8;
+  --g-charcoal: #FDFBF8;
+  --g-charcoal-light: #EDE8E0;
+  --g-text: #2C2A26;
+  --g-text-secondary: #6B6560;
+  --g-text-tertiary: #9C948B;
+  --g-border: rgba(0, 0, 0, 0.09);
+  --g-border-light: rgba(0, 0, 0, 0.04);
+  --g-amber: #B87D1A;
+  --g-amber-hover: #A26E15;
+  --g-amber-glow: rgba(184, 125, 26, 0.12);
+  --g-danger: #D05A4E;
+  --g-danger-bg: rgba(208, 90, 78, 0.08);
+  --g-success: #4A8F5A;
+
+  --g-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --g-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.07);
+  --g-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.1);
+  --g-shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.08);
+
+  --g-toolbar-btn: rgba(0, 0, 0, 0.05);
+  --g-toolbar-btn-hover: rgba(0, 0, 0, 0.08);
+  --g-toolbar-btn-active: rgba(0, 0, 0, 0.12);
+  --g-toolbar-text: rgba(0, 0, 0, 0.5);
+  --g-toolbar-text-hover: #2C2A26;
+  --g-toolbar-divider: rgba(0, 0, 0, 0.1);
+  --g-toolbar-gradient: rgba(0, 0, 0, 0.012);
+  --g-card-menu-bg: rgba(255, 255, 255, 0.9);
+  --g-overlay-bg: rgba(0, 0, 0, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--g-bg);
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.35);
+}

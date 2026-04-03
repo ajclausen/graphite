@@ -1,0 +1,32 @@
+.annotated-pdf-viewer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #525659;
+  overflow: hidden;
+}
+
+.pdf-content-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Active annotation button */
+.pdf-toolbar button.active {
+  background-color: #007bff;
+  color: white;
+}
+
+.pdf-toolbar button.active:hover {
+  background-color: #0056b3;
+}
+
+/* Ensure PDF viewer fills the wrapper */
+.pdf-content-wrapper .pdf-canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}

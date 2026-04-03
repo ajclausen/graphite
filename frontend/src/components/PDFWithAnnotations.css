@@ -1,0 +1,41 @@
+.pdf-with-annotations-container {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem;
+  background-color: #525659;
+}
+
+.pdf-page-wrapper {
+  position: relative;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  background: white;
+}
+
+.annotation-layer {
+  z-index: 10;
+}
+
+/* Make Excalidraw fill the exact dimensions */
+.annotation-layer .excalidraw {
+  width: 100% !important;
+  height: 100% !important;
+  background: transparent !important;
+}
+
+.annotation-layer .excalidraw .App-canvas {
+  background: transparent !important;
+}
+
+/* Hide scrollbars in Excalidraw since we're using PDF container scroll */
+.annotation-layer .excalidraw {
+  overflow: hidden !important;
+}
+
+.loading {
+  padding: 2rem;
+  color: #ccc;
+  font-size: 1.25rem;
+}

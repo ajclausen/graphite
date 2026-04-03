@@ -1,0 +1,41 @@
+.excalidraw-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Only allow pointer events on the actual canvas */
+.excalidraw-overlay .excalidraw {
+  pointer-events: none;
+}
+
+.excalidraw-overlay .excalidraw canvas {
+  pointer-events: auto;
+}
+
+/* Make Excalidraw background transparent */
+.excalidraw-overlay .excalidraw {
+  background: transparent !important;
+}
+
+.excalidraw-overlay .excalidraw .Island {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(4px);
+}
+
+/* Ensure canvas is transparent */
+.excalidraw-overlay canvas {
+  background: transparent !important;
+}
+
+/* Style the toolbar */
+.excalidraw-overlay .App-toolbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 100;
+}
