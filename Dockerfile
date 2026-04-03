@@ -26,7 +26,7 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 # Install build tools for better-sqlite3 native compilation
-RUN apk add --no-cache python3 make g++
+RUN apk add --no-cache python3 make g++ su-exec
 
 COPY package.json package-lock.json ./
 COPY backend/package.json ./backend/
@@ -42,6 +42,10 @@ COPY --from=backend-build /app/backend/dist ./backend/dist
 # Copy built frontend
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
+# Copy startup entrypoint
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
+
 # Create data directory and non-root user
 RUN addgroup -S graphite && adduser -S graphite -G graphite
 RUN mkdir -p /data && chown -R graphite:graphite /data
@@ -56,6 +60,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
-USER graphite
-
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "backend/dist/index.js"]
