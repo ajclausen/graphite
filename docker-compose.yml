@@ -1,8 +1,8 @@
 services:
   graphite:
-    build: .
-    # To use a pre-built image instead, comment out 'build' and uncomment 'image':
-    # image: ghcr.io/ajclausen/graphite:latest
+    image: ghcr.io/ajclausen/graphite:latest
+    # To build from source instead, comment out 'image' and uncomment 'build':
+    # build: .
     ports:
       - "${GRAPHITE_PORT:-3000}:3000"
     volumes:
