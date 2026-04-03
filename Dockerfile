@@ -1,5 +1,5 @@
 # Stage 1: Build frontend
-FROM node:20-alpine AS frontend-build
+FROM node:22-alpine AS frontend-build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/
@@ -11,7 +11,7 @@ COPY frontend/ ./frontend/
 RUN npm run build --workspace=frontend
 
 # Stage 2: Build backend
-FROM node:20-alpine AS backend-build
+FROM node:22-alpine AS backend-build
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
@@ -22,7 +22,7 @@ COPY backend/ ./backend/
 RUN npm run build --workspace=backend
 
 # Stage 3: Production image
-FROM node:20-alpine AS production
+FROM node:22-alpine AS production
 WORKDIR /app
 
 # Install build tools for better-sqlite3 native compilation
