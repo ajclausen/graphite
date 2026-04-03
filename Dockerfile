@@ -5,13 +5,14 @@ COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
 # Disable husky's root prepare hook inside container installs.
-RUN HUSKY=0 npm ci --workspace=frontend --workspace=backend --legacy-peer-deps
+RUN HUSKY=0 npm ci --workspace=frontend --legacy-peer-deps
 COPY frontend/ ./frontend/
 RUN npm run build --workspace=frontend
 
 # Stage 2: Build backend
 FROM node:20-alpine AS backend-build
 WORKDIR /app
+RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/

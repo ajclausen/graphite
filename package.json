@@ -17,7 +17,7 @@
     "lint": "npm run lint --workspaces",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,md}\"",
-    "prepare": "husky"
+    "prepare": "[ -d .git ] && husky || true"
   },
   "devDependencies": {
     "lint-staged": "^15.2.0",
