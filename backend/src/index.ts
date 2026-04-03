@@ -222,6 +222,6 @@ async function bootstrapFirstRun(): Promise<void> {
 }
 
 startServer().catch((err) => {
-  logger.error('Failed to start server:', err);
+  logger.error({ err }, 'Failed to start server');
   process.exit(1);
 });
