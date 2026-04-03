@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="frontend/public/graphite-logo.png" width="80" alt="Graphite" />
+  <img src="frontend/public/logo.png" width="80" alt="Graphite" />
   <h1>Graphite</h1>
   <p><strong>Self-hosted PDF annotation with Excalidraw</strong></p>
   <p>
