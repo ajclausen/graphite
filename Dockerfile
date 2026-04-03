@@ -4,8 +4,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
-# Disable husky's root prepare hook inside container installs.
-RUN HUSKY=0 npm ci --workspace=frontend --legacy-peer-deps
+# Install the full workspace tree in builder stages to avoid npm workspace
+# edge cases where frontend-only installs omit required hoisted build deps.
+RUN HUSKY=0 npm ci --legacy-peer-deps
 COPY frontend/ ./frontend/
 RUN npm run build --workspace=frontend
 
@@ -16,7 +17,7 @@ RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
-RUN HUSKY=0 npm ci --workspace=backend --legacy-peer-deps
+RUN HUSKY=0 npm ci --legacy-peer-deps
 COPY backend/ ./backend/
 RUN npm run build --workspace=backend
 
