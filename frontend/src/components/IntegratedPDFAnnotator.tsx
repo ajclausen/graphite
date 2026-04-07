@@ -410,7 +410,7 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
       <div className="main-toolbar">
         <div className="toolbar-left">
           <button onClick={onBack} className="brand-home" title="Back to library">
-            <img className="brand-home-mark" src="/graphite-logo.png" alt="Graphite" />
+            <img className="brand-home-mark" src="/logo.png" alt="Graphite" />
           </button>
           <div className="toolbar-divider" />
           <button onClick={onBack} className="home-button" title="Back to library">

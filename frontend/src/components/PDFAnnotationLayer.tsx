@@ -3,6 +3,7 @@ import { Document, Page } from 'react-pdf';
 import { Excalidraw } from '@excalidraw/excalidraw';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types';
 import { useAnnotationStore } from '../store/annotationStore';
+import { PDF_DOCUMENT_OPTIONS } from '../utils/pdfOptions';
 import './PDFAnnotationLayer.css';
 
 interface PDFAnnotationLayerProps {
@@ -83,6 +84,7 @@ export const PDFAnnotationLayer: React.FC<PDFAnnotationLayerProps> = ({ file }) 
         <div className={`pdf-page-container ${isAnnotating ? 'annotating' : ''}`}>
           <Document
             file={file}
+            options={PDF_DOCUMENT_OPTIONS}
             onLoadSuccess={handleDocumentLoadSuccess}
             loading={<div className="loading">Loading PDF...</div>}
           >

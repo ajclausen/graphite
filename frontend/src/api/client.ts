@@ -4,11 +4,9 @@ export interface Document {
   id: string;
   filename: string;
   original_name: string;
-  file_path: string;
   file_size: number;
   page_count: number | null;
   thumbnail_path: string | null;
-  user_id: string | null;
   file_type: 'pdf' | 'image';
   mime_type: string | null;
   created_at: string;

@@ -85,7 +85,7 @@ function App() {
         <>
           <header className="app-header">
             <div className="app-brand">
-              <img className="app-brand-mark" src="/graphite-logo.png" alt="Graphite logo" />
+              <img className="app-brand-mark" src="/logo.png" alt="Graphite logo" />
               <div className="app-brand-text">
                 <h1>Graphite</h1>
                 <p className="app-tagline">annotate &middot; sketch &middot; export</p>

@@ -56,20 +56,52 @@ if (trustProxy === '1' || trustProxy === 'true') {
   app.set('trust proxy', trustProxy);
 }
 
+app.use((_req, res, next) => {
+  res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+  next();
+});
+
 // Security middleware
 app.use(helmet({
+  hsts: process.env.NODE_ENV === 'production'
+    ? {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true,
+      }
+    : false,
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      baseUri: ["'self'"],
+      objectSrc: ["'none'"],
+      styleSrc: [
+        "'self'",
+        "https://fonts.googleapis.com",
+        (_req, res) => `'nonce-${(res as express.Response).locals.cspNonce}'`,
+      ],
+      // Excalidraw still relies on inline style attributes, but nonce-gated
+      // <style> tags avoid blanket inline stylesheet execution.
+      styleSrcAttr: ["'unsafe-inline'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:"],
-      scriptSrc: ["'self'", "'unsafe-eval'"], // Required: PDF.js and Excalidraw both use new Function()
+      scriptSrc: [
+        "'self'",
+        (_req, res) => `'nonce-${(res as express.Response).locals.cspNonce}'`,
+      ],
       workerSrc: ["'self'", "blob:"], // Required for PDF.js web worker
       connectSrc: ["'self'"],
     },
   },
 }));
+
+app.use((_req, res, next) => {
+  res.setHeader(
+    'Permissions-Policy',
+    'camera=(), geolocation=(), microphone=(), payment=(), usb=()',
+  );
+  next();
+});
 if (process.env.NODE_ENV !== 'production') {
   app.use(cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -81,12 +113,22 @@ if (process.env.NODE_ENV !== 'production') {
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 300,
+  standardHeaders: false,
+  legacyHeaders: false,
 });
 app.use('/api/', limiter);
 
 // Body parsing middleware
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof SyntaxError && 'body' in err && req.is('application/json')) {
+    res.status(400).json({ error: 'Invalid JSON body.' });
+    return;
+  }
+  next(err);
+});
 
 // Import routes
 import documentsRouter from './routes/documents';
@@ -130,14 +172,19 @@ async function startServer(): Promise<void> {
   // In production, serve the frontend build
   if (process.env.NODE_ENV === 'production') {
     const frontendPath = path.join(__dirname, '../../frontend/dist');
-    app.use(express.static(frontendPath));
+    const frontendIndexPath = path.join(frontendPath, 'index.html');
+    const frontendIndexTemplate = fs.readFileSync(frontendIndexPath, 'utf8');
+
+    app.use(express.static(frontendPath, { index: false }));
 
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api')) {
         next();
         return;
       }
-      res.sendFile(path.join(frontendPath, 'index.html'));
+      res.type('html').send(
+        frontendIndexTemplate.replaceAll('__CSP_NONCE__', res.locals.cspNonce),
+      );
     });
   }
 

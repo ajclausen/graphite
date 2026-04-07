@@ -62,7 +62,7 @@ export const ChangePasswordPage: React.FC = () => {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
-          <img className="auth-brand-mark" src="/graphite-logo.png" alt="Graphite logo" />
+          <img className="auth-brand-mark" src="/logo.png" alt="Graphite logo" />
           <div className="auth-brand-text">
             <h1>Graphite</h1>
             <p className="auth-tagline">annotate &middot; sketch &middot; export</p>

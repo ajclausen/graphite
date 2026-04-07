@@ -17,6 +17,15 @@ const ALLOWED_MIME_SET = new Set([
   'image/webp',
 ]);
 
+class UnsupportedFileTypeError extends Error {
+  statusCode = 400;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnsupportedFileTypeError';
+  }
+}
+
 /**
  * Safely remove an uploaded file, logging but not throwing on failure.
  */
@@ -73,6 +82,54 @@ async function validateMagicBytes(
   return { valid: false, detectedMime: detected?.mime };
 }
 
+function detectEmbeddedPdfJavaScript(filePath: string): string[] {
+  const pdfText = fs.readFileSync(filePath, 'latin1');
+  const actionMarkers = [/\/OpenAction\b/i, /\/AA\b/i];
+  const scriptMarkers = [/\/S\s*\/JavaScript\b/i, /\/JavaScript\b/i, /\/JS\b/i];
+
+  if (!actionMarkers.some((pattern) => pattern.test(pdfText))) {
+    return [];
+  }
+
+  const findings = scriptMarkers
+    .filter((pattern) => pattern.test(pdfText))
+    .map((pattern) => pattern.source);
+
+  return [...new Set(findings)];
+}
+
+function serializeDocument(doc: Record<string, unknown>) {
+  const { file_path: _filePath, user_id: _userId, ...publicDoc } = doc;
+  return publicDoc;
+}
+
+function runUploadMiddleware(middleware: express.RequestHandler): express.RequestHandler {
+  return (req, res, next) => {
+    middleware(req, res, (err?: unknown) => {
+      if (!err) {
+        next();
+        return;
+      }
+
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          res.status(413).json({ error: 'Uploaded file exceeds the size limit' });
+          return;
+        }
+        res.status(400).json({ error: err.message });
+        return;
+      }
+
+      if (err instanceof UnsupportedFileTypeError) {
+        res.status(err.statusCode).json({ error: err.message });
+        return;
+      }
+
+      next(err);
+    });
+  };
+}
+
 const router = express.Router();
 
 const DATA_DIR = process.env.DATA_DIR || './data';
@@ -102,7 +159,7 @@ const fileUpload = multer({
     if (ALLOWED_MIME_SET.has(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only PDF and image files (JPEG, PNG, WebP) are allowed'));
+      cb(new UnsupportedFileTypeError('Only PDF and image files (JPEG, PNG, WebP) are allowed'));
     }
   },
   limits: { fileSize: 50 * 1024 * 1024 },
@@ -114,7 +171,7 @@ const thumbnailUpload = multer({
     if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png') {
       cb(null, true);
     } else {
-      cb(new Error('Only JPEG/PNG images are allowed'));
+      cb(new UnsupportedFileTypeError('Only JPEG/PNG images are allowed'));
     }
   },
   limits: { fileSize: 2 * 1024 * 1024 },
@@ -132,13 +189,16 @@ function resolveWithin(baseDir: string, relativePath: string): string | null {
 const uploadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
-  standardHeaders: true,
+  standardHeaders: false,
   legacyHeaders: false,
   message: { error: 'Too many uploads, please try again later' },
 });
 
+const handleDocumentUpload = runUploadMiddleware(fileUpload.single('file'));
+const handleThumbnailUpload = runUploadMiddleware(thumbnailUpload.single('thumbnail'));
+
 // POST / -- Upload a PDF or image
-router.post('/', uploadLimiter, fileUpload.single('file'), async (req, res): Promise<void> => {
+router.post('/', uploadLimiter, handleDocumentUpload, async (req, res): Promise<void> => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'No file uploaded' });
@@ -165,6 +225,15 @@ router.post('/', uploadLimiter, fileUpload.single('file'), async (req, res): Pro
         error: `File content does not match declared type. Declared: ${req.file.mimetype}, detected: ${detectedMime || 'unknown'}`,
       });
       return;
+    }
+
+    if (req.file.mimetype === 'application/pdf') {
+      const embeddedJavaScriptFindings = detectEmbeddedPdfJavaScript(uploadedFilePath);
+      if (embeddedJavaScriptFindings.length > 0) {
+        cleanupFile(uploadedFilePath);
+        res.status(400).json({ error: 'PDFs containing embedded JavaScript actions are not allowed' });
+        return;
+      }
     }
 
     // Check per-user storage quota (default 500MB)
@@ -205,7 +274,7 @@ router.post('/', uploadLimiter, fileUpload.single('file'), async (req, res): Pro
     }
 
     const inserted = await db('documents').where({ id }).first();
-    res.status(201).json(inserted);
+    res.status(201).json(serializeDocument(inserted));
   } catch (error) {
     logger.error('Upload error:', error);
     res.status(500).json({ error: 'Failed to upload file' });
@@ -219,7 +288,7 @@ router.get('/', async (req, res) => {
     const docs = await db('documents')
       .where({ user_id: userId })
       .orderBy('created_at', 'desc');
-    res.json(docs);
+    res.json(docs.map((doc) => serializeDocument(doc)));
   } catch (error) {
     logger.error('List error:', error);
     res.status(500).json({ error: 'Failed to list documents' });
@@ -236,7 +305,7 @@ router.get('/:id', async (req, res): Promise<void> => {
       res.status(404).json({ error: 'Document not found' });
       return;
     }
-    res.json(doc);
+    res.json(serializeDocument(doc));
   } catch (error) {
     logger.error('Get error:', error);
     res.status(500).json({ error: 'Failed to get document' });
@@ -272,7 +341,7 @@ router.patch('/:id', async (req, res): Promise<void> => {
     }
 
     const doc = await db('documents').where({ id: req.params.id, user_id: req.session.userId }).first();
-    res.json(doc);
+    res.json(serializeDocument(doc));
   } catch (error) {
     logger.error('Update error:', error);
     res.status(500).json({ error: 'Failed to update document' });
@@ -343,6 +412,7 @@ const serveFile = async (req: express.Request, res: express.Response): Promise<v
 
     const contentType = doc.mime_type || 'application/pdf';
     res.setHeader('Content-Type', contentType);
+    res.setHeader('X-Download-Options', 'noopen');
     const safeName = doc.original_name.replace(/["\\\r\n]/g, '_');
     res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
     res.sendFile(filePath);
@@ -356,7 +426,7 @@ router.get('/:id/file', serveFile);
 router.get('/:id/pdf', serveFile);
 
 // POST /:id/thumbnail -- Upload client-generated thumbnail
-router.post('/:id/thumbnail', uploadLimiter, thumbnailUpload.single('thumbnail'), async (req, res): Promise<void> => {
+router.post('/:id/thumbnail', uploadLimiter, handleThumbnailUpload, async (req, res): Promise<void> => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'No thumbnail uploaded' });
@@ -386,7 +456,7 @@ router.post('/:id/thumbnail', uploadLimiter, thumbnailUpload.single('thumbnail')
       .update({ thumbnail_path: thumbnailPath, updated_at: new Date().toISOString() });
 
     const updatedDoc = await db('documents').where({ id: req.params.id, user_id: req.session.userId }).first();
-    res.json(updatedDoc);
+    res.json(serializeDocument(updatedDoc));
   } catch (error) {
     logger.error('Thumbnail upload error:', error);
     res.status(500).json({ error: 'Failed to upload thumbnail' });

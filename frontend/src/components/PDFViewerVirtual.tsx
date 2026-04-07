@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Document, Page } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
+import { PDF_DOCUMENT_OPTIONS } from '../utils/pdfOptions';
 import './PDFViewer.css';
 
 interface PDFViewerProps {
@@ -83,6 +84,7 @@ export const PDFViewerVirtual: React.FC<PDFViewerProps> = ({
       
       <Document
         file={file}
+        options={PDF_DOCUMENT_OPTIONS}
         onLoadSuccess={onDocumentLoadSuccess}
         loading=""
       >

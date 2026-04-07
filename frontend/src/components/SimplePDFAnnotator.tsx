@@ -4,6 +4,7 @@ import { Excalidraw } from '@excalidraw/excalidraw';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types';
 import { useAnnotationStore } from '../store/annotationStore';
+import { PDF_DOCUMENT_OPTIONS } from '../utils/pdfOptions';
 import './SimplePDFAnnotator.css';
 
 interface SimplePDFAnnotatorProps {
@@ -83,6 +84,7 @@ export const SimplePDFAnnotator: React.FC<SimplePDFAnnotatorProps> = ({ file }) 
           <div className="pdf-view-container">
             <Document
               file={file}
+              options={PDF_DOCUMENT_OPTIONS}
               onLoadSuccess={handleDocumentLoadSuccess}
               loading={<div className="loading">Loading PDF...</div>}
             >

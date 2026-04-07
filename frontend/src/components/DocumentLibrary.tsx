@@ -10,6 +10,7 @@ import {
   getDocumentThumbnailUrl,
   getDocumentFileUrl,
 } from '../api/client';
+import { PDF_DOCUMENT_OPTIONS } from '../utils/pdfOptions';
 import './DocumentLibrary.css';
 
 const ACCEPTED_TYPES = new Set([
@@ -56,7 +57,10 @@ function normalizeDocumentName(value: string, currentName: string): string {
 async function generateThumbnail(file: File): Promise<Blob> {
   if (file.type === 'application/pdf') {
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+    const pdf = await pdfjs.getDocument({
+      data: new Uint8Array(arrayBuffer),
+      ...PDF_DOCUMENT_OPTIONS,
+    }).promise;
     const page = await pdf.getPage(1);
     const viewport = page.getViewport({ scale: 0.5 });
 

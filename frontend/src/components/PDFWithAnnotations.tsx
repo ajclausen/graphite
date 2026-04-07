@@ -3,6 +3,7 @@ import { Document, Page } from 'react-pdf';
 import { Excalidraw } from '@excalidraw/excalidraw';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types';
+import { PDF_DOCUMENT_OPTIONS } from '../utils/pdfOptions';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import './PDFWithAnnotations.css';
@@ -52,6 +53,7 @@ export const PDFWithAnnotations: React.FC<PDFWithAnnotationsProps> = ({
       <div className="pdf-page-wrapper" style={{ position: 'relative' }}>
         <Document
           file={file}
+          options={PDF_DOCUMENT_OPTIONS}
           onLoadSuccess={onDocumentLoadSuccess}
           loading={<div className="loading">Loading PDF...</div>}
         >
