@@ -5,6 +5,13 @@ import fs from 'fs';
 const DATA_DIR = process.env.DATA_DIR || './data';
 const DB_FILENAME = process.env.DB_FILENAME || 'graphite.db';
 const MIGRATIONS_DIR = path.resolve(__dirname, 'migrations');
+const MIGRATION_EXTENSION = __filename.endsWith('.ts') ? '.ts' : '.js';
+
+function getRuntimeMigrationFiles(): string[] {
+  return fs.readdirSync(MIGRATIONS_DIR)
+    .filter((fileName) => path.extname(fileName) === MIGRATION_EXTENSION)
+    .sort();
+}
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -23,7 +30,7 @@ const db = Knex({
   },
   migrations: {
     directory: MIGRATIONS_DIR,
-    loadExtensions: ['.js', '.ts'],
+    loadExtensions: [MIGRATION_EXTENSION],
   },
 });
 
@@ -33,7 +40,7 @@ async function normalizeRecordedMigrationNames(): Promise<void> {
     return;
   }
 
-  const migrationFiles = fs.readdirSync(MIGRATIONS_DIR);
+  const migrationFiles = getRuntimeMigrationFiles();
   const migrationFileByStem = new Map(
     migrationFiles.map((fileName) => [path.parse(fileName).name, fileName]),
   );
