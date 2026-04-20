@@ -197,8 +197,15 @@ export const useAnnotationStore = create<AnnotationState>((set, get) => ({
   },
 
   setDocumentId: (id) => {
-    if (!id) cancelAllTimers();
-    set({ documentId: id, saveStatus: 'idle' });
+    cancelAllTimers();
+    _pending = null;
+    set({
+      documentId: id,
+      annotations: {},
+      pageMetrics: {},
+      saveStatus: 'idle',
+      isDirty: false,
+    });
   },
 
   loadAnnotationsFromServer: async (documentId) => {

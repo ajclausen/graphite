@@ -35,6 +35,7 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
   const [pageNumber, setPageNumber] = useState(1);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isInitialViewportReady, setIsInitialViewportReady] = useState(false);
+  const [annotationsReady, setAnnotationsReady] = useState(false);
 
   const { setAnnotations, getAnnotations, setPageMetric, getPageMetric, saveStatus } = useAnnotationStore();
   const annotationContainerRef = useRef<HTMLDivElement | null>(null);
@@ -58,8 +59,16 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
     setPageNumber(1);
     setLoadError(null);
     setIsInitialViewportReady(false);
+    setAnnotationsReady(false);
     setViewport(defaultViewport);
     initialFitDoneRef.current = false;
+
+    // Cancel any in-flight debounce from the previous document so its
+    // elements don't leak into the new document's store via the 300ms timer.
+    if (timeoutRef.current !== null) {
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
 
     const store = useAnnotationStore.getState();
     store.setDocumentId(doc.id);
@@ -68,6 +77,8 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
       try {
         // Load annotations from server
         await store.loadAnnotationsFromServer(doc.id);
+        if (cancelled) return;
+        setAnnotationsReady(true);
 
         if (isImage) {
           // No PDF to load — image rendering handled by ImagePageViewLayer
@@ -525,10 +536,10 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
           </div>
 
           <div style={{ width: '100%', height: '100%', position: 'relative', zIndex: 2 }}>
-            {isInitialViewportReady && (
+            {isInitialViewportReady && annotationsReady && (
               <ErrorBoundary fallback={<div style={{ padding: '2rem', color: 'red' }}>Excalidraw failed to load!</div>}>
                 <Excalidraw
-                  key={`page-${pageNumber}`}
+                  key={`${doc.id}-page-${pageNumber}`}
                   initialData={{
                     elements: getCurrentAnnotations(pageNumber),
                     appState: {
