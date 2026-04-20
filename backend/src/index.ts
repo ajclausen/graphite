@@ -75,13 +75,14 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       baseUri: ["'self'"],
       objectSrc: ["'none'"],
+      // Excalidraw 0.17 injects its stylesheet at runtime via
+      // document.createElement("style"), so 'unsafe-inline' is required for
+      // style-src. Script-src remains nonce-locked.
       styleSrc: [
         "'self'",
+        "'unsafe-inline'",
         "https://fonts.googleapis.com",
-        (_req, res) => `'nonce-${(res as express.Response).locals.cspNonce}'`,
       ],
-      // Excalidraw still relies on inline style attributes, but nonce-gated
-      // <style> tags avoid blanket inline stylesheet execution.
       styleSrcAttr: ["'unsafe-inline'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:"],
