@@ -1,0 +1,402 @@
+.pdf-page-manager {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  display: flex;
+  flex-direction: column;
+  background: var(--g-bg-elevated);
+  color: var(--g-text);
+}
+
+.pdf-page-manager-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 58px;
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid var(--g-border);
+  background: var(--g-charcoal);
+  box-shadow: var(--g-shadow-sm);
+}
+
+.pdf-page-manager-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.pdf-page-manager-toolbar-group.is-scrollable {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 0.1rem;
+}
+
+.pdf-page-manager-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 360px;
+  font-family: var(--g-font-body);
+}
+
+.pdf-page-manager-title strong {
+  overflow: hidden;
+  color: var(--g-text);
+  font-size: 0.88rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdf-page-manager-title span {
+  color: var(--g-text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 300;
+}
+
+.pdf-page-manager-divider {
+  width: 1px;
+  height: 1.6rem;
+  flex: 0 0 auto;
+  background: var(--g-toolbar-divider);
+}
+
+.pdf-page-manager-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-width: 0;
+  height: 36px;
+  padding: 0 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--g-toolbar-btn);
+  color: var(--g-text);
+  font-family: var(--g-font-body);
+  font-size: 0.82rem;
+  font-weight: 400;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.pdf-page-manager-button svg {
+  flex: 0 0 auto;
+}
+
+.pdf-page-manager-button:hover:not(:disabled) {
+  background: var(--g-toolbar-btn-hover);
+  color: var(--g-toolbar-text-hover);
+}
+
+.pdf-page-manager-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.pdf-page-manager-button.is-primary {
+  background: var(--g-amber);
+  color: #fff;
+}
+
+.pdf-page-manager-button.is-primary:hover:not(:disabled) {
+  background: var(--g-amber-hover);
+}
+
+.pdf-page-manager-button.is-danger {
+  color: var(--g-danger);
+}
+
+.pdf-page-manager-button.is-danger:hover:not(:disabled) {
+  background: var(--g-danger-bg);
+  border-color: rgba(208, 90, 78, 0.24);
+}
+
+.pdf-page-manager-subbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 38px;
+  padding: 0.45rem 1.2rem;
+  border-bottom: 1px solid var(--g-border-light);
+  background: var(--g-surface);
+  color: var(--g-text-secondary);
+  font-family: var(--g-font-body);
+  font-size: 0.78rem;
+}
+
+.pdf-page-manager-subbar span:last-child {
+  color: var(--g-amber);
+}
+
+.pdf-page-manager-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  align-content: start;
+  gap: 1.25rem;
+  overflow: auto;
+  padding: 1.5rem;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.02), transparent 120px),
+    var(--g-bg-elevated);
+}
+
+.pdf-page-thumbnail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 206px;
+  padding: 0.85rem 0.75rem 0.65rem;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: var(--g-surface);
+  color: var(--g-text);
+  box-shadow: var(--g-shadow-sm);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pdf-page-thumbnail.is-drop-before::before,
+.pdf-page-thumbnail.is-drop-after::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  width: 4px;
+  background: var(--g-amber);
+  border-radius: 2px;
+  z-index: 5;
+  box-shadow: 0 0 10px var(--g-amber-glow, rgba(245, 158, 11, 0.55));
+  pointer-events: none;
+}
+
+.pdf-page-thumbnail.is-drop-before::before {
+  left: -10px;
+}
+
+.pdf-page-thumbnail.is-drop-after::after {
+  right: -10px;
+}
+
+.pdf-page-thumbnail:hover {
+  background: var(--g-surface-hover);
+  box-shadow: var(--g-shadow-md);
+}
+
+.pdf-page-thumbnail.is-selected {
+  border-color: var(--g-amber);
+  box-shadow: 0 0 0 3px var(--g-amber-glow), var(--g-shadow-md);
+}
+
+.pdf-page-thumbnail.is-active:not(.is-selected) {
+  border-color: var(--g-border);
+}
+
+.pdf-page-thumbnail.is-dragging {
+  opacity: 0.48;
+  transform: scale(0.98);
+}
+
+.pdf-page-thumbnail-canvas-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 198px;
+  height: 146px;
+  border: 1px solid var(--g-border);
+  border-radius: 4px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.pdf-page-thumbnail-canvas-wrap canvas {
+  display: block;
+  max-width: 190px;
+  max-height: 138px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.pdf-page-thumbnail-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.92);
+  color: #58524c;
+  font-family: var(--g-font-body);
+  font-size: 0.75rem;
+}
+
+.pdf-page-thumbnail-footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 22px;
+  width: 100%;
+  color: var(--g-text);
+  font-family: var(--g-font-body);
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.pdf-page-thumbnail-source {
+  color: var(--g-text-tertiary);
+  font-size: 0.7rem;
+  font-weight: 300;
+}
+
+.pdf-page-manager-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--g-overlay-bg);
+  backdrop-filter: blur(8px);
+}
+
+.pdf-page-manager-modal {
+  width: min(100%, 460px);
+  padding: 1.5rem;
+  border: 1px solid var(--g-border);
+  border-radius: 8px;
+  background: var(--g-surface);
+  box-shadow: var(--g-shadow-lg);
+}
+
+.pdf-page-manager-modal h2 {
+  margin: 0;
+  color: var(--g-text);
+  font-family: var(--g-font-display);
+  font-size: 1.2rem;
+  font-weight: 400;
+}
+
+.pdf-page-manager-modal p {
+  overflow: hidden;
+  margin: 0.35rem 0 1.15rem;
+  color: var(--g-text-secondary);
+  font-family: var(--g-font-body);
+  font-size: 0.88rem;
+  font-weight: 300;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdf-page-manager-modal-label {
+  display: block;
+  margin: 0.85rem 0 0.4rem;
+  color: var(--g-text-secondary);
+  font-family: var(--g-font-body);
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pdf-page-manager-modal-input {
+  width: 100%;
+  border: 1px solid var(--g-border);
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  background: var(--g-bg);
+  color: var(--g-text);
+  font-family: var(--g-font-body);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.pdf-page-manager-modal-input:focus {
+  border-color: var(--g-amber);
+  box-shadow: 0 0 0 2px var(--g-amber-glow);
+}
+
+.pdf-page-manager-modal-hint {
+  min-height: 1.1rem;
+  margin-top: 0.45rem;
+  color: var(--g-text-tertiary);
+  font-family: var(--g-font-body);
+  font-size: 0.78rem;
+  font-weight: 300;
+}
+
+.pdf-page-manager-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.15rem;
+}
+
+.pdf-page-manager-modal-actions button {
+  border: none;
+  border-radius: 8px;
+  padding: 0.55rem 1rem;
+  background: var(--g-surface-hover);
+  color: var(--g-text);
+  font-family: var(--g-font-body);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.pdf-page-manager-modal-actions button:hover:not(:disabled) {
+  background: var(--g-surface-active);
+}
+
+.pdf-page-manager-modal-actions .is-primary {
+  background: var(--g-amber);
+  color: #fff;
+}
+
+.pdf-page-manager-modal-actions .is-primary:hover:not(:disabled) {
+  background: var(--g-amber-hover);
+}
+
+.pdf-page-manager-modal-actions button:disabled,
+.pdf-page-manager-modal-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+@media (max-width: 880px) {
+  .pdf-page-manager-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pdf-page-manager-toolbar-group {
+    width: 100%;
+  }
+
+  .pdf-page-manager-title {
+    max-width: none;
+  }
+
+  .pdf-page-manager-grid {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 0.9rem;
+    padding: 1rem;
+  }
+
+  .pdf-page-thumbnail-canvas-wrap {
+    width: 158px;
+    height: 122px;
+  }
+
+  .pdf-page-thumbnail-canvas-wrap canvas {
+    max-width: 152px;
+    max-height: 116px;
+  }
+}

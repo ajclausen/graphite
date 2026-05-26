@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as pdfjs from 'pdfjs-dist';
+import { PDFDocument } from 'pdf-lib';
 import {
   type Document,
   listDocuments,
@@ -54,6 +55,79 @@ function normalizeDocumentName(value: string, currentName: string): string {
   return trimmed;
 }
 
+function parsePageRange(value: string, pageCount: number): { pages: number[]; error: string | null } {
+  const tokens = value
+    .split(',')
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  if (tokens.length === 0) {
+    return { pages: [], error: 'Enter at least one page or range.' };
+  }
+
+  const pages: number[] = [];
+  const seen = new Set<number>();
+
+  for (const token of tokens) {
+    const match = token.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
+    if (!match) {
+      return { pages: [], error: 'Use pages like 1, 3-5, 8.' };
+    }
+
+    const start = Number(match[1]);
+    const end = match[2] ? Number(match[2]) : start;
+
+    if (start < 1 || end < 1 || start > pageCount || end > pageCount) {
+      return { pages: [], error: `Pages must be between 1 and ${pageCount}.` };
+    }
+
+    if (end < start) {
+      return { pages: [], error: 'Page ranges must go from low to high.' };
+    }
+
+    for (let page = start; page <= end; page += 1) {
+      if (!seen.has(page)) {
+        seen.add(page);
+        pages.push(page);
+      }
+    }
+  }
+
+  return { pages, error: null };
+}
+
+function createSelectedPdfName(fileName: string, rangeText: string): string {
+  const extMatch = fileName.match(/\.pdf$/i);
+  const baseName = extMatch ? fileName.slice(0, -4) : fileName;
+  const suffix = rangeText.replace(/[^0-9,-]+/g, '').replace(/,+/g, '-');
+  return `${baseName}_pages_${suffix || 'selected'}.pdf`;
+}
+
+async function getPdfPageCount(file: File): Promise<number> {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({
+    data: new Uint8Array(arrayBuffer),
+    ...PDF_DOCUMENT_OPTIONS,
+  }).promise;
+  const pageCount = pdf.numPages;
+  await pdf.destroy();
+  return pageCount;
+}
+
+async function createPdfWithSelectedPages(file: File, pages: number[], outputName: string): Promise<File> {
+  const sourcePdf = await PDFDocument.load(await file.arrayBuffer());
+  const nextPdf = await PDFDocument.create();
+  const copiedPages = await nextPdf.copyPages(sourcePdf, pages.map((page) => page - 1));
+
+  for (const page of copiedPages) {
+    nextPdf.addPage(page);
+  }
+
+  const pdfBytes = await nextPdf.save();
+  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+  return new File([blob], outputName, { type: 'application/pdf' });
+}
+
 async function generateThumbnail(file: File): Promise<Blob> {
   if (file.type === 'application/pdf') {
     const arrayBuffer = await file.arrayBuffer();
@@ -70,6 +144,7 @@ async function generateThumbnail(file: File): Promise<Blob> {
     const ctx = canvas.getContext('2d')!;
 
     await page.render({ canvasContext: ctx, viewport }).promise;
+    await pdf.destroy();
 
     return new Promise<Blob>((resolve) => {
       canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.7);
@@ -105,6 +180,13 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [preparingPdf, setPreparingPdf] = useState(false);
+  const [pendingPdfImport, setPendingPdfImport] = useState<{
+    file: File;
+    pageCount: number;
+    rangeText: string;
+    error: string | null;
+  } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [menuDocId, setMenuDocId] = useState<string | null>(null);
   const [renameDoc, setRenameDoc] = useState<Document | null>(null);
@@ -183,12 +265,7 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
     return () => document.removeEventListener('keydown', handleEscape);
   }, [renameDoc, renaming]);
 
-  const handleUpload = useCallback(async (file: File) => {
-    if (!ACCEPTED_TYPES.has(file.type)) {
-      alert('Please upload a PDF or image file');
-      return;
-    }
-
+  const uploadPreparedFile = useCallback(async (file: File): Promise<boolean> => {
     setUploading(true);
     try {
       const doc = await uploadDocument(file);
@@ -199,13 +276,83 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
         .catch((err) => console.error('Thumbnail generation failed:', err));
 
       await loadDocuments();
+      return true;
     } catch (err) {
       console.error('Upload failed:', err);
       alert('Failed to upload file');
+      return false;
     } finally {
       setUploading(false);
     }
   }, [loadDocuments]);
+
+  const handleUpload = useCallback(async (file: File) => {
+    if (!ACCEPTED_TYPES.has(file.type)) {
+      alert('Please upload a PDF or image file');
+      return;
+    }
+
+    if (file.type !== 'application/pdf') {
+      await uploadPreparedFile(file);
+      return;
+    }
+
+    setPreparingPdf(true);
+    try {
+      const pageCount = await getPdfPageCount(file);
+
+      if (pageCount <= 1) {
+        await uploadPreparedFile(file);
+        return;
+      }
+
+      setPendingPdfImport({
+        file,
+        pageCount,
+        rangeText: `1-${pageCount}`,
+        error: null,
+      });
+    } catch (err) {
+      console.error('Failed to inspect PDF:', err);
+      alert('Failed to read PDF pages');
+    } finally {
+      setPreparingPdf(false);
+    }
+  }, [uploadPreparedFile]);
+
+  const handlePdfImportSubmit = useCallback(async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!pendingPdfImport) return;
+
+    const { pages, error } = parsePageRange(pendingPdfImport.rangeText, pendingPdfImport.pageCount);
+    if (error) {
+      setPendingPdfImport((current) => current ? { ...current, error } : current);
+      return;
+    }
+
+    try {
+      const isAllPages = pages.length === pendingPdfImport.pageCount &&
+        pages.every((page, index) => page === index + 1);
+      const fileToUpload = isAllPages
+        ? pendingPdfImport.file
+        : await createPdfWithSelectedPages(
+          pendingPdfImport.file,
+          pages,
+          createSelectedPdfName(pendingPdfImport.file.name, pendingPdfImport.rangeText),
+        );
+
+      const success = await uploadPreparedFile(fileToUpload);
+      if (success) {
+        setPendingPdfImport(null);
+      }
+    } catch (err) {
+      console.error('Failed to prepare selected PDF pages:', err);
+      setPendingPdfImport((current) => current ? {
+        ...current,
+        error: 'Failed to prepare the selected pages.',
+      } : current);
+    }
+  }, [pendingPdfImport, uploadPreparedFile]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -329,6 +476,10 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
     </button>
   );
 
+  const pendingPdfSelection = pendingPdfImport
+    ? parsePageRange(pendingPdfImport.rangeText, pendingPdfImport.pageCount)
+    : null;
+
   if (loading) {
     return (
       <div className="library-container">
@@ -350,13 +501,13 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
         <button
           className="library-upload-btn"
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
+          disabled={uploading || preparingPdf}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-          {uploading ? 'Uploading...' : 'Upload'}
+          {uploading ? 'Uploading...' : preparingPdf ? 'Reading PDF...' : 'Upload'}
         </button>
         <input
           ref={fileInputRef}
@@ -512,6 +663,62 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {pendingPdfImport && (
+        <div
+          className="library-modal-backdrop"
+          onClick={() => {
+            if (!uploading) {
+              setPendingPdfImport(null);
+            }
+          }}
+        >
+          <div
+            className="library-modal library-modal-wide"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2>Import PDF Pages</h2>
+            <p>
+              Choose which pages to import from {pendingPdfImport.file.name}.
+            </p>
+            <form onSubmit={handlePdfImportSubmit}>
+              <label className="library-modal-label" htmlFor="pdf-page-range">
+                Pages
+              </label>
+              <input
+                id="pdf-page-range"
+                className="library-modal-input"
+                value={pendingPdfImport.rangeText}
+                onChange={(event) => setPendingPdfImport((current) => current ? {
+                  ...current,
+                  rangeText: event.target.value,
+                  error: null,
+                } : current)}
+                placeholder="1-3, 5, 8"
+                disabled={uploading}
+              />
+              <div className="library-modal-hint">
+                {pendingPdfImport.error || pendingPdfSelection?.error || (
+                  `${pendingPdfSelection?.pages.length || 0} of ${pendingPdfImport.pageCount} pages selected`
+                )}
+              </div>
+              <div className="library-modal-actions">
+                <button
+                  type="button"
+                  className="library-modal-secondary"
+                  onClick={() => setPendingPdfImport(null)}
+                  disabled={uploading}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="library-modal-primary" disabled={uploading}>
+                  {uploading ? 'Importing...' : 'Import'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

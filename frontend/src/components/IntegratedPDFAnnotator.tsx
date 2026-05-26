@@ -7,6 +7,8 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { PDFExporter } from './PDFExporter';
 import { PDFPageViewLayer } from './PDFPageViewLayer';
 import { ImagePageViewLayer } from './ImagePageViewLayer';
+import { PDFPageManager } from './PDFPageManager';
+import { PDFPageSidebar } from './PDFPageSidebar';
 import { getDocumentPdfUrl, getDocumentFileUrl, updateDocument, listDocuments } from '../api/client';
 import type { Document } from '../api/client';
 import { ThemeToggle } from './ThemeToggle';
@@ -36,12 +38,23 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isInitialViewportReady, setIsInitialViewportReady] = useState(false);
   const [annotationsReady, setAnnotationsReady] = useState(false);
+  const [pageManagerOpen, setPageManagerOpen] = useState(false);
+  const [pageSidebarOpen, setPageSidebarOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = window.localStorage.getItem('graphite:pageSidebarOpen');
+    return stored === null ? true : stored === 'true';
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem('graphite:pageSidebarOpen', String(pageSidebarOpen));
+  }, [pageSidebarOpen]);
 
   const { setAnnotations, getAnnotations, setPageMetric, getPageMetric, saveStatus } = useAnnotationStore();
   const annotationContainerRef = useRef<HTMLDivElement | null>(null);
   const pageElementRef = useRef<HTMLDivElement | null>(null);
   const timeoutRef = useRef<number | null>(null);
   const initialFitDoneRef = useRef(false);
+  const pendingPageAfterReloadRef = useRef<number | null>(null);
   const [allDocuments, setAllDocuments] = useState<Document[]>([]);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const selectorRef = useRef<HTMLDivElement>(null);
@@ -56,7 +69,9 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
 
     setPdfDocument(null);
     setNumPages(null);
-    setPageNumber(1);
+    const initialPageNumber = pendingPageAfterReloadRef.current ?? 1;
+    pendingPageAfterReloadRef.current = null;
+    setPageNumber(initialPageNumber);
     setLoadError(null);
     setIsInitialViewportReady(false);
     setAnnotationsReady(false);
@@ -133,7 +148,7 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
       currentStore.flushAllPendingSaves().catch(console.error);
       currentStore.setDocumentId(null);
     };
-  }, [doc.id, doc.page_count, isImage]);
+  }, [doc.id, doc.page_count, doc.updated_at, isImage]);
 
   useEffect(() => {
     return () => {
@@ -391,15 +406,26 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
     };
   }, [viewport]);
 
-  const goToPrevPage = () => {
+  const goToPage = useCallback((nextPage: number) => {
+    if (!numPages) return;
     flushPendingAnnotations();
-    setPageNumber((prev) => Math.max(1, prev - 1));
-  };
+    setPageNumber(Math.min(numPages, Math.max(1, nextPage)));
+  }, [numPages]);
 
-  const goToNextPage = () => {
-    flushPendingAnnotations();
-    setPageNumber((prev) => Math.min(numPages || 1, prev + 1));
-  };
+  const handleDocumentUpdatedFromManager = useCallback((updatedDoc: Document, nextPage: number) => {
+    pendingPageAfterReloadRef.current = nextPage;
+    setAllDocuments((prev) => prev.map((item) => (
+      item.id === updatedDoc.id ? updatedDoc : item
+    )));
+    onDocumentChange(updatedDoc);
+  }, [onDocumentChange]);
+
+  const handleDocumentCreatedFromManager = useCallback((newDoc: Document) => {
+    setAllDocuments((prev) => [
+      newDoc,
+      ...prev.filter((item) => item.id !== newDoc.id),
+    ]);
+  }, []);
 
   const handleDocumentSwitch = useCallback(async (newDoc: Document) => {
     if (newDoc.id === doc.id) {
@@ -424,12 +450,19 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
             <img className="brand-home-mark" src="/logo.png" alt="Graphite" />
           </button>
           <div className="toolbar-divider" />
-          <button onClick={onBack} className="home-button" title="Back to library">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-          </button>
+          {!isImage && (
+            <button
+              onClick={() => setPageSidebarOpen((open) => !open)}
+              className={`sidebar-toggle-button${pageSidebarOpen ? ' is-active' : ''}`}
+              title={pageSidebarOpen ? 'Hide page sidebar' : 'Show page sidebar'}
+              aria-pressed={pageSidebarOpen}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <line x1="9" y1="4" x2="9" y2="20" />
+              </svg>
+            </button>
+          )}
           <div className="toolbar-divider" />
           <div className="doc-selector" ref={selectorRef}>
             <button
@@ -471,23 +504,39 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
           )}
         </div>
 
-        <div className="toolbar-center">
-          {!isImage && (
-            <>
-              <button onClick={goToPrevPage} disabled={pageNumber <= 1}>&#8249;</button>
-              <span className="page-info">{pageNumber}/{numPages || '...'}</span>
-              <button onClick={goToNextPage} disabled={pageNumber >= (numPages || 1)}>&#8250;</button>
-            </>
-          )}
-        </div>
-
         <div className="toolbar-right">
+          {!isImage && (
+            <button
+              className="manage-pages-button"
+              onClick={() => setPageManagerOpen(true)}
+              disabled={!numPages}
+              title="Manage PDF pages"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
+              <span>Pages</span>
+            </button>
+          )}
           <ThemeToggle />
           <PDFExporter documentId={doc.id} originalName={doc.original_name} numPages={numPages || 1} fileType={doc.file_type} />
         </div>
       </div>
 
       <div className="content-area">
+        {pageSidebarOpen && !isImage && numPages ? (
+          <PDFPageSidebar
+            documentId={doc.id}
+            documentUpdatedAt={doc.updated_at}
+            pdfDocument={pdfDocument}
+            numPages={numPages}
+            currentPage={pageNumber}
+            onGoToPage={goToPage}
+          />
+        ) : null}
         <div className="annotation-container" ref={annotationContainerRef}>
           <div
             className="pdf-background"
@@ -595,6 +644,19 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
           </div>
         </div>
       </div>
+
+      {pageManagerOpen && !isImage && numPages && (
+        <PDFPageManager
+          document={doc}
+          pdfDocument={pdfDocument}
+          numPages={numPages}
+          currentPage={pageNumber}
+          onClose={() => setPageManagerOpen(false)}
+          onGoToPage={goToPage}
+          onDocumentUpdated={handleDocumentUpdatedFromManager}
+          onDocumentCreated={handleDocumentCreatedFromManager}
+        />
+      )}
     </div>
   );
 };

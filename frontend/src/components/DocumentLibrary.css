@@ -456,6 +456,10 @@
   border: 1px solid var(--g-border);
 }
 
+.library-modal-wide {
+  width: min(100%, 460px);
+}
+
 .library-modal h2 {
   margin: 0;
   font-family: var(--g-font-display);
@@ -487,6 +491,24 @@
 .library-modal-input:focus {
   border-color: var(--g-amber);
   box-shadow: 0 0 0 2px var(--g-amber-glow);
+}
+
+.library-modal-label {
+  display: block;
+  margin: 0 0 0.4rem;
+  color: var(--g-text-secondary);
+  font-size: 0.74rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.library-modal-hint {
+  min-height: 1.1rem;
+  margin-top: 0.45rem;
+  color: var(--g-text-tertiary);
+  font-size: 0.78rem;
+  font-weight: 300;
 }
 
 .library-modal-actions {

@@ -188,6 +188,93 @@ export async function deleteDocument(id: string): Promise<void> {
   return request<void>(`/api/documents/${id}`, { method: 'DELETE' });
 }
 
+export async function editPdfPages(
+  id: string,
+  operation:
+    | { action: 'delete'; pageNumber: number }
+    | { action: 'insertBlank'; pageNumber: number; placement: 'before' | 'after' },
+): Promise<{ document: Document; pageNumber: number }> {
+  return request<{ document: Document; pageNumber: number }>(`/api/documents/${id}/pages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(operation),
+  });
+}
+
+export async function importPdfPages(
+  id: string,
+  file: File,
+  options: { pageNumber: number; placement: 'before' | 'after'; pageRange: string },
+): Promise<{ document: Document; pageNumber: number }> {
+  const formData = new FormData();
+  formData.append('sourcePdf', file);
+  formData.append('pageNumber', String(options.pageNumber));
+  formData.append('placement', options.placement);
+  formData.append('pageRange', options.pageRange);
+
+  return request<{ document: Document; pageNumber: number }>(`/api/documents/${id}/pages/import`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export async function reorderPdfPages(
+  id: string,
+  pageOrder: number[],
+): Promise<{ document: Document; pageNumber: number }> {
+  return request<{ document: Document; pageNumber: number }>(`/api/documents/${id}/pages/reorder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pageOrder }),
+  });
+}
+
+export async function deletePdfPages(
+  id: string,
+  pageNumbers: number[],
+): Promise<{ document: Document; pageNumber: number }> {
+  return request<{ document: Document; pageNumber: number }>(`/api/documents/${id}/pages/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pageNumbers }),
+  });
+}
+
+export async function rotatePdfPages(
+  id: string,
+  pageNumbers: number[],
+  degrees: 90 | 180 | 270 | -90 = 90,
+): Promise<{ document: Document; pageNumber: number }> {
+  return request<{ document: Document; pageNumber: number }>(`/api/documents/${id}/pages/rotate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pageNumbers, degrees }),
+  });
+}
+
+export async function duplicatePdfPages(
+  id: string,
+  pageNumbers: number[],
+  insertAfterPage?: number,
+): Promise<{ document: Document; pageNumber: number }> {
+  return request<{ document: Document; pageNumber: number }>(`/api/documents/${id}/pages/duplicate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pageNumbers, insertAfterPage }),
+  });
+}
+
+export async function extractPdfPages(
+  id: string,
+  pageNumbers: number[],
+): Promise<{ document: Document }> {
+  return request<{ document: Document }>(`/api/documents/${id}/pages/extract`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pageNumbers }),
+  });
+}
+
 export function getDocumentPdfUrl(id: string): string {
   return `/api/documents/${id}/pdf`;
 }

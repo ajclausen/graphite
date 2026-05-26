@@ -22,7 +22,7 @@
   color: var(--g-text);
   padding: 0.5rem 1rem;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr 1fr;
   align-items: center;
   gap: 0.75rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -49,13 +49,6 @@
   gap: 0.5rem;
   justify-self: start;
   min-width: 0;
-}
-
-.toolbar-center {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  justify-self: center;
 }
 
 .toolbar-right {
@@ -98,22 +91,6 @@
 }
 
 /* Home icon button */
-
-.home-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.35rem !important;
-  border-radius: 6px !important;
-  background: transparent !important;
-  color: var(--g-toolbar-text);
-  transition: color 0.2s ease, background-color 0.2s ease !important;
-}
-
-.home-button:hover:not(:disabled) {
-  background: var(--g-toolbar-btn-hover) !important;
-  color: var(--g-toolbar-text-hover) !important;
-}
 
 /* Document selector */
 
@@ -359,18 +336,34 @@
   letter-spacing: 0.03em;
 }
 
+.manage-pages-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 30px;
+  padding: 0 0.65rem !important;
+  color: var(--g-toolbar-text-hover) !important;
+}
+
+.manage-pages-button span {
+  font-size: 0.78rem;
+}
+
 .content-area {
   flex: 1;
   position: relative;
   overflow: hidden;
   height: calc(100vh - 45px);
+  display: flex;
+  flex-direction: row;
 }
 
 
 /* Annotation Mode Styles */
 .annotation-container {
-  width: 100%;
-  height: calc(100vh - 45px);
+  flex: 1;
+  min-width: 0;
+  height: 100%;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -486,4 +479,116 @@
   font-family: var(--g-font-body);
   font-weight: 300;
   text-align: center;
+}
+
+.pdf-page-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--g-overlay-bg);
+  backdrop-filter: blur(8px);
+}
+
+.pdf-page-modal {
+  width: min(100%, 460px);
+  padding: 1.5rem;
+  border: 1px solid var(--g-border);
+  border-radius: var(--g-radius-lg);
+  background: var(--g-surface);
+  box-shadow: var(--g-shadow-lg);
+}
+
+.pdf-page-modal h2 {
+  margin: 0;
+  color: var(--g-text);
+  font-family: var(--g-font-display);
+  font-size: 1.2rem;
+  font-weight: 400;
+}
+
+.pdf-page-modal p {
+  margin: 0.35rem 0 1.15rem;
+  color: var(--g-text-secondary);
+  font-family: var(--g-font-body);
+  font-size: 0.88rem;
+  font-weight: 300;
+}
+
+.pdf-page-modal-label {
+  display: block;
+  margin: 0.85rem 0 0.4rem;
+  color: var(--g-text-secondary);
+  font-family: var(--g-font-body);
+  font-size: 0.74rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pdf-page-modal-input {
+  width: 100%;
+  border: 1px solid var(--g-border);
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  background: var(--g-bg);
+  color: var(--g-text);
+  font-family: var(--g-font-body);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.pdf-page-modal-input:focus {
+  border-color: var(--g-amber);
+  box-shadow: 0 0 0 2px var(--g-amber-glow);
+}
+
+.pdf-page-modal-hint {
+  min-height: 1.1rem;
+  margin-top: 0.45rem;
+  color: var(--g-text-tertiary);
+  font-family: var(--g-font-body);
+  font-size: 0.78rem;
+  font-weight: 300;
+}
+
+.pdf-page-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.15rem;
+}
+
+.pdf-page-modal-actions button {
+  border: none;
+  border-radius: 8px;
+  padding: 0.55rem 1rem;
+  background: var(--g-surface-hover);
+  color: var(--g-text);
+  font-family: var(--g-font-body);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.pdf-page-modal-actions button:hover:not(:disabled) {
+  background: var(--g-surface-active);
+}
+
+.pdf-page-modal-actions .pdf-page-modal-primary {
+  background: var(--g-amber);
+  color: white;
+}
+
+.pdf-page-modal-actions .pdf-page-modal-primary:hover:not(:disabled) {
+  background: var(--g-amber-hover);
+}
+
+.pdf-page-modal-actions button:disabled,
+.pdf-page-modal-input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }

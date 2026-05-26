@@ -1,0 +1,124 @@
+.pdf-page-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--g-bg-elevated);
+  border-right: 1px solid var(--g-toolbar-divider);
+  overflow: hidden;
+}
+
+.pdf-page-sidebar-header {
+  padding: 0.6rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--g-text-muted, #6b7280);
+  border-bottom: 1px solid var(--g-toolbar-divider);
+  flex-shrink: 0;
+}
+
+.pdf-page-sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.75rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pdf-sidebar-thumbnail {
+  position: relative;
+  background: transparent;
+  border: none;
+  padding: 0.25rem;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  transition: background-color 0.15s ease;
+  width: 100%;
+}
+
+.pdf-sidebar-thumbnail:hover {
+  background: var(--g-toolbar-btn-hover, rgba(0, 0, 0, 0.05));
+}
+
+.pdf-sidebar-thumbnail.is-active {
+  background: var(--g-amber-soft, rgba(245, 158, 11, 0.12));
+}
+
+.pdf-sidebar-thumbnail-canvas-wrap {
+  position: relative;
+  width: 100%;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--g-toolbar-divider);
+  border-radius: 4px;
+  background: #ffffff;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.pdf-sidebar-thumbnail.is-active .pdf-sidebar-thumbnail-canvas-wrap {
+  border-color: var(--g-amber, #f59e0b);
+  box-shadow: 0 0 0 2px var(--g-amber, #f59e0b);
+}
+
+.pdf-sidebar-thumbnail-canvas-wrap canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.pdf-sidebar-thumbnail-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--g-text-muted, #6b7280);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.pdf-sidebar-thumbnail-label {
+  font-size: 0.75rem;
+  color: var(--g-text-muted, #6b7280);
+  font-variant-numeric: tabular-nums;
+}
+
+.pdf-sidebar-thumbnail.is-active .pdf-sidebar-thumbnail-label {
+  color: var(--g-text);
+  font-weight: 600;
+}
+
+/* Sidebar toggle button in toolbar */
+.sidebar-toggle-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: var(--g-toolbar-text);
+  transition: color 0.2s ease, background-color 0.2s ease !important;
+}
+
+.sidebar-toggle-button:hover:not(:disabled) {
+  background: var(--g-toolbar-btn-hover) !important;
+  color: var(--g-toolbar-text-hover) !important;
+}
+
+.sidebar-toggle-button.is-active {
+  background: var(--g-toolbar-btn-hover) !important;
+  color: var(--g-toolbar-text-hover) !important;
+}
