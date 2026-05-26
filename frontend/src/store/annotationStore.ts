@@ -48,6 +48,13 @@ interface AnnotationState {
 // when called from Excalidraw's onChange handler.
 let _pending: { pageNumber: number; elements: readonly ExcalidrawElement[] } | null = null;
 
+// Debounce timer that commits _pending to the store. Lives at module scope so
+// that flushPendingAnnotations() can cancel it from anywhere — important for
+// destructive operations like page reorder where a fire-after-flush would
+// write stale page-number data back to the backend.
+let _commitTimer: ReturnType<typeof setTimeout> | null = null;
+const PENDING_COMMIT_DELAY_MS = 300;
+
 // Per-page auto-save debounce timers
 const _saveTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
@@ -113,12 +120,28 @@ function cancelAllTimers() {
 
 export function setPendingAnnotations(pageNumber: number, elements: readonly ExcalidrawElement[]) {
   _pending = { pageNumber, elements };
+  if (_commitTimer) clearTimeout(_commitTimer);
+  _commitTimer = setTimeout(() => {
+    _commitTimer = null;
+    flushPendingAnnotations();
+  }, PENDING_COMMIT_DELAY_MS);
 }
 
 export function flushPendingAnnotations() {
+  if (_commitTimer) {
+    clearTimeout(_commitTimer);
+    _commitTimer = null;
+  }
   if (_pending) {
     const { pageNumber, elements } = _pending;
-    useAnnotationStore.getState().setAnnotations(pageNumber, elements);
+    const state = useAnnotationStore.getState();
+    const currentStored = state.annotations[pageNumber] || [];
+    if (
+      elements.length !== currentStored.length ||
+      JSON.stringify(elements) !== JSON.stringify(currentStored)
+    ) {
+      state.setAnnotations(pageNumber, elements);
+    }
     _pending = null;
   }
 }

@@ -49,10 +49,9 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
     window.localStorage.setItem('graphite:pageSidebarOpen', String(pageSidebarOpen));
   }, [pageSidebarOpen]);
 
-  const { setAnnotations, getAnnotations, setPageMetric, getPageMetric, saveStatus } = useAnnotationStore();
+  const { getAnnotations, setPageMetric, getPageMetric, saveStatus } = useAnnotationStore();
   const annotationContainerRef = useRef<HTMLDivElement | null>(null);
   const pageElementRef = useRef<HTMLDivElement | null>(null);
-  const timeoutRef = useRef<number | null>(null);
   const initialFitDoneRef = useRef(false);
   const pendingPageAfterReloadRef = useRef<number | null>(null);
   const [allDocuments, setAllDocuments] = useState<Document[]>([]);
@@ -77,13 +76,6 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
     setAnnotationsReady(false);
     setViewport(defaultViewport);
     initialFitDoneRef.current = false;
-
-    // Cancel any in-flight debounce from the previous document so its
-    // elements don't leak into the new document's store via the 300ms timer.
-    if (timeoutRef.current !== null) {
-      window.clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
 
     const store = useAnnotationStore.getState();
     store.setDocumentId(doc.id);
@@ -149,14 +141,6 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
       currentStore.setDocumentId(null);
     };
   }, [doc.id, doc.page_count, doc.updated_at, isImage]);
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current !== null) {
-        window.clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
 
   // Flush saves before browser close/refresh
   useEffect(() => {
@@ -379,21 +363,7 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({ 
 
   const handleAnnotationsChange = useCallback((elements: readonly any[]) => {
     setPendingAnnotations(pageNumber, elements);
-
-    if (timeoutRef.current !== null) {
-      window.clearTimeout(timeoutRef.current);
-    }
-
-    timeoutRef.current = window.setTimeout(() => {
-      const currentStored = getAnnotations(pageNumber);
-      if (
-        elements.length !== currentStored.length ||
-        JSON.stringify(elements) !== JSON.stringify(currentStored)
-      ) {
-        setAnnotations(pageNumber, elements);
-      }
-    }, 300);
-  }, [pageNumber, setAnnotations, getAnnotations]);
+  }, [pageNumber]);
 
   const getCurrentAnnotations = useCallback((pageNum: number) => {
     return getAnnotations(pageNum);

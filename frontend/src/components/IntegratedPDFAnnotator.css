@@ -175,10 +175,10 @@
   font-family: var(--g-font-body);
 }
 
-.doc-selector-item {
+.doc-selector-dropdown .doc-selector-item {
   width: 100%;
   border: none;
-  background: transparent;
+  background-color: transparent;
   color: var(--g-text);
   text-align: left;
   font-size: 0.85rem;
@@ -194,18 +194,18 @@
   transition: background-color 0.15s ease;
 }
 
-.doc-selector-item:hover {
-  background: var(--g-border-light);
+.doc-selector-dropdown .doc-selector-item:hover {
+  background-color: var(--g-border-light);
 }
 
-.doc-selector-item.is-active {
-  background: var(--g-amber-glow);
+.doc-selector-dropdown .doc-selector-item.is-active {
+  background-color: var(--g-amber-glow);
   color: var(--g-amber-hover);
   font-weight: 500;
 }
 
-.doc-selector-item.is-active:hover {
-  background: rgba(193, 127, 36, 0.14);
+.doc-selector-dropdown .doc-selector-item.is-active:hover {
+  background-color: rgba(193, 127, 36, 0.14);
 }
 
 .doc-selector-item-name {
