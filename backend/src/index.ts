@@ -38,10 +38,14 @@ if (sessionSecret.source !== 'env') {
   );
 }
 
-if (process.env.NODE_ENV === 'production' && !process.env.ALLOWED_ORIGIN) {
+if (
+  process.env.NODE_ENV === 'production' &&
+  !process.env.ALLOWED_ORIGINS &&
+  !process.env.ALLOWED_ORIGIN
+) {
   logger.warn(
-    'ALLOWED_ORIGIN is not set. CSRF origin validation will derive from the Host header, ' +
-    'which may be unreliable behind misconfigured proxies. Set ALLOWED_ORIGIN to your public URL.'
+    'ALLOWED_ORIGINS is not set. CSRF origin validation will derive from the Host header, ' +
+    'which may be unreliable behind misconfigured proxies. Set ALLOWED_ORIGINS to your public URL.'
   );
 }
 

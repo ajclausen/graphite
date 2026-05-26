@@ -1,9 +1,16 @@
 import { createHash } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { createReadStream, cpSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, extname, join, resolve, sep } from 'node:path'
 import { defineConfig } from 'vite'
 import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+
+const require = createRequire(import.meta.url)
+
+const EXCALIDRAW_ASSET_BASE = '/vendor/excalidraw'
+const EXCALIDRAW_ASSET_REQUEST_PREFIX = `${EXCALIDRAW_ASSET_BASE}/dist`
+const EXCALIDRAW_ASSET_OUTPUT_DIR = 'vendor/excalidraw/dist'
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -20,7 +27,7 @@ function sriPlugin(): Plugin {
     name: 'graphite-sri',
     apply: 'build',
     configResolved(config) {
-      outDir = config.build.outDir
+      outDir = resolve(config.root, config.build.outDir)
     },
     writeBundle(_, bundle) {
       const integrityByAssetPath = new Map<string, string>()
@@ -58,9 +65,83 @@ function sriPlugin(): Plugin {
   }
 }
 
+function getExcalidrawDistPath(): string {
+  return join(dirname(require.resolve('@excalidraw/excalidraw/package.json')), 'dist')
+}
+
+function getContentType(filePath: string): string {
+  switch (extname(filePath)) {
+    case '.js':
+      return 'application/javascript; charset=utf-8'
+    case '.json':
+      return 'application/json; charset=utf-8'
+    case '.woff2':
+      return 'font/woff2'
+    case '.txt':
+      return 'text/plain; charset=utf-8'
+    default:
+      return 'application/octet-stream'
+  }
+}
+
+function excalidrawAssetsPlugin(): Plugin {
+  let outDir = 'dist'
+
+  return {
+    name: 'graphite-excalidraw-assets',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir)
+    },
+    configureServer(server) {
+      const sourceDist = resolve(getExcalidrawDistPath())
+
+      server.middlewares.use((req, res, next) => {
+        const requestPath = req.url?.split('?', 1)[0] ?? ''
+        const assetPrefix = `${EXCALIDRAW_ASSET_REQUEST_PREFIX}/`
+
+        if (!requestPath.startsWith(assetPrefix)) {
+          next()
+          return
+        }
+
+        let assetPath: string
+        try {
+          assetPath = decodeURIComponent(requestPath.slice(assetPrefix.length))
+        } catch {
+          res.statusCode = 400
+          res.end('Bad request')
+          return
+        }
+
+        const filePath = resolve(sourceDist, assetPath)
+        if (!filePath.startsWith(`${sourceDist}${sep}`)) {
+          res.statusCode = 403
+          res.end('Forbidden')
+          return
+        }
+
+        if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+          next()
+          return
+        }
+
+        res.setHeader('Content-Type', getContentType(filePath))
+        createReadStream(filePath).pipe(res)
+      })
+    },
+    writeBundle() {
+      const sourceDir = join(getExcalidrawDistPath(), 'excalidraw-assets')
+      const targetDir = join(outDir, EXCALIDRAW_ASSET_OUTPUT_DIR, 'excalidraw-assets')
+
+      mkdirSync(targetDir, { recursive: true })
+      cpSync(sourceDir, targetDir, { recursive: true })
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), sriPlugin()],
+  plugins: [react(), excalidrawAssetsPlugin(), sriPlugin()],
   optimizeDeps: {
     exclude: ['pdfjs-dist'],
   },

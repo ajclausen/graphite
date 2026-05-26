@@ -99,7 +99,7 @@ export function requireCompletedSetup(
 
 /**
  * CSRF protection for state-changing requests.
- * Validates Origin header against the expected origin. When Origin is absent,
+ * Validates Origin header against trusted origins. When Origin is absent,
  * falls back to checking the Referer header. Rejects requests that provide
  * neither header to defend against cross-origin form submissions.
  */
@@ -114,13 +114,13 @@ export function csrfProtection(
     return;
   }
 
-  const expectedOrigin = getExpectedOrigin(req);
+  const allowedOrigins = getAllowedOrigins(req);
   const origin = req.get('Origin');
 
   // Primary check: validate Origin header when present
   if (origin) {
-    if (origin !== expectedOrigin) {
-      logger.warn({ origin, expectedOrigin }, 'CSRF origin mismatch');
+    if (!allowedOrigins.includes(origin)) {
+      logger.warn({ origin, allowedOrigins }, 'CSRF origin mismatch');
       res.status(403).json({ error: 'Origin mismatch' });
       return;
     }
@@ -133,8 +133,8 @@ export function csrfProtection(
   if (referer) {
     try {
       const refererOrigin = new URL(referer).origin;
-      if (refererOrigin !== expectedOrigin) {
-        logger.warn({ refererOrigin, expectedOrigin }, 'CSRF referer mismatch');
+      if (!allowedOrigins.includes(refererOrigin)) {
+        logger.warn({ refererOrigin, allowedOrigins }, 'CSRF referer mismatch');
         res.status(403).json({ error: 'Origin mismatch' });
         return;
       }
@@ -156,14 +156,47 @@ export function csrfProtection(
 }
 
 /**
- * Determines the expected origin for CSRF validation.
- * In production, uses ALLOWED_ORIGIN env var if set (hardened against Host
- * header manipulation), otherwise derives from the request.
+ * Determines trusted origins for CSRF validation.
+ * In production, uses ALLOWED_ORIGINS/ALLOWED_ORIGIN env vars if set
+ * (hardened against Host header manipulation), otherwise derives from the request.
  * In development, uses FRONTEND_URL env var or defaults to localhost:5173.
  */
-function getExpectedOrigin(req: Request): string {
+function getAllowedOrigins(req: Request): string[] {
   if (process.env.NODE_ENV === 'production') {
-    return process.env.ALLOWED_ORIGIN || `${req.protocol}://${req.get('host')}`;
+    const configuredOrigins = parseOrigins([
+      process.env.ALLOWED_ORIGINS,
+      process.env.ALLOWED_ORIGIN,
+    ]);
+
+    return configuredOrigins.length > 0
+      ? configuredOrigins
+      : [`${req.protocol}://${req.get('host')}`];
   }
-  return process.env.FRONTEND_URL || 'http://localhost:5173';
+
+  const configuredOrigins = parseOrigins([process.env.FRONTEND_URL]);
+  return configuredOrigins.length > 0 ? configuredOrigins : ['http://localhost:5173'];
+}
+
+function parseOrigins(values: Array<string | undefined>): string[] {
+  const origins = new Set<string>();
+
+  for (const value of values) {
+    for (const origin of value?.split(/[,\s]+/) ?? []) {
+      const normalized = normalizeOrigin(origin);
+      if (normalized) origins.add(normalized);
+    }
+  }
+
+  return [...origins];
+}
+
+function normalizeOrigin(origin: string | undefined): string | undefined {
+  const trimmed = origin?.trim();
+  if (!trimmed) return undefined;
+
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed.replace(/\/+$/, '');
+  }
 }

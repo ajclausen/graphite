@@ -86,6 +86,8 @@ All configuration is via environment variables in `docker-compose.yml` or a `.en
 | `SESSION_SECRET_FILE` | Override path for the persisted auto-generated session secret | `/data/session-secret` | No |
 | `BOOTSTRAP_ADMIN_PASSWORD` | Optional first-run admin password override. If unset, Graphite generates one and logs it once on first boot | auto-generated | No |
 | `TRUST_PROXY` | Set to `1` when behind a reverse proxy (nginx, Caddy, Traefik) | — | No |
+| `ALLOWED_ORIGINS` | Public app origins used for CSRF checks behind a reverse proxy or tunnel, separated by commas or spaces | derived from request | Recommended for public deployments |
+| `ALLOWED_ORIGIN` | Backward-compatible single public app origin for CSRF checks | derived from request | No |
 | `GRAPHITE_PORT` | Host port to expose | `3000` | No |
 
 ### Data persistence
@@ -102,7 +104,14 @@ docker compose start
 
 ### Running behind a reverse proxy
 
-For public deployments, place Graphite behind a reverse proxy that handles HTTPS. Set `TRUST_PROXY=1` so the app correctly reads client IPs and secure cookie flags.
+For public deployments, place Graphite behind a reverse proxy that handles HTTPS. Set `TRUST_PROXY=1` so the app correctly reads client IPs and secure cookie flags. Set `ALLOWED_ORIGINS` to the public URL or URLs so CSRF checks compare against the browser origin instead of the container's internal HTTP connection.
+
+For Cloudflare Tunnel, the relevant settings are:
+
+```env
+TRUST_PROXY=1
+ALLOWED_ORIGINS=https://graphite.example.com,https://draw.example.com
+```
 
 **Caddy** (automatic HTTPS):
 
