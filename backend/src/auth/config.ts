@@ -6,6 +6,30 @@ import { resolveSessionSecret } from './sessionSecret';
 
 const SqliteStore = BetterSqlite3SessionStore(session);
 
+export type CookieSecureMode = 'auto' | 'true' | 'false';
+
+/**
+ * Resolves COOKIE_SECURE:
+ *   auto  (default) Secure on HTTPS requests only. Behind a TLS-terminating
+ *                   proxy this relies on TRUST_PROXY so X-Forwarded-Proto counts.
+ *   true            Always Secure. Sign-in will not work over plain HTTP.
+ *   false           Never Secure. Only for HTTP-only setups that must not
+ *                   depend on request detection.
+ */
+export function resolveCookieSecureMode(value = process.env.COOKIE_SECURE): CookieSecureMode {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized || normalized === 'auto') return 'auto';
+  if (normalized === 'true' || normalized === '1') return 'true';
+  if (normalized === 'false' || normalized === '0') return 'false';
+  throw new Error(`COOKIE_SECURE must be "auto", "true" or "false" (got "${value}")`);
+}
+
+function toCookieSecure(mode: CookieSecureMode): boolean | 'auto' {
+  if (mode === 'true') return true;
+  if (mode === 'false') return false;
+  return 'auto';
+}
+
 export function createSessionConfig(sqliteClient: BetterSqlite3.Database): SessionOptions {
   const { secret } = resolveSessionSecret();
 
@@ -23,7 +47,11 @@ export function createSessionConfig(sqliteClient: BetterSqlite3.Database): Sessi
     }),
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      // 'auto' (the default) marks the cookie Secure only on HTTPS requests,
+      // so plain-HTTP self-hosting (localhost, LAN IP) can sign in while
+      // HTTPS deployments still get Secure cookies. A hard `true` here made
+      // express-session drop the cookie entirely over HTTP.
+      secure: toCookieSecure(resolveCookieSecureMode()),
       sameSite: 'lax' as const,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       path: '/',

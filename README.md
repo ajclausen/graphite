@@ -85,7 +85,8 @@ All configuration is via environment variables in `docker-compose.yml` or a `.en
 | `SESSION_SECRET` | Signs session cookies. Optional; if unset, Graphite generates and persists one under `/data/session-secret` | auto-generated | No |
 | `SESSION_SECRET_FILE` | Override path for the persisted auto-generated session secret | `/data/session-secret` | No |
 | `BOOTSTRAP_ADMIN_PASSWORD` | Optional first-run admin password override. If unset, Graphite generates one and logs it once on first boot | auto-generated | No |
-| `TRUST_PROXY` | Set to `1` when behind a reverse proxy (nginx, Caddy, Traefik) | — | No |
+| `TRUST_PROXY` | Set to `1` when behind a reverse proxy (nginx, Caddy, Traefik). Required for HTTPS-terminating proxies so Graphite knows requests arrived over HTTPS | — | Yes, behind a proxy |
+| `COOKIE_SECURE` | When the session cookie gets the `Secure` flag. `auto` marks it Secure on HTTPS requests only, so plain-HTTP access (localhost, a LAN IP) can still sign in. `true` always sets it, which breaks sign-in over plain HTTP. `false` never sets it | `auto` | No |
 | `ALLOWED_ORIGINS` | Public app origins used for CSRF checks behind a reverse proxy or tunnel, separated by commas or spaces | derived from request | Recommended for public deployments |
 | `ALLOWED_ORIGIN` | Backward-compatible single public app origin for CSRF checks | derived from request | No |
 | `GRAPHITE_PORT` | Host port to expose | `3000` | No |
@@ -104,7 +105,7 @@ docker compose start
 
 ### Running behind a reverse proxy
 
-For public deployments, place Graphite behind a reverse proxy that handles HTTPS. Set `TRUST_PROXY=1` so the app correctly reads client IPs and secure cookie flags. Set `ALLOWED_ORIGINS` to the public URL or URLs so CSRF checks compare against the browser origin instead of the container's internal HTTP connection.
+For public deployments, place Graphite behind a reverse proxy that handles HTTPS. Set `TRUST_PROXY=1` so the app correctly reads client IPs and knows requests arrived over HTTPS; with the default `COOKIE_SECURE=auto`, that is what makes session cookies `Secure`. If you want sign-in to refuse to work over anything but HTTPS, also set `COOKIE_SECURE=true`. Set `ALLOWED_ORIGINS` to the public URL or URLs so CSRF checks compare against the browser origin instead of the container's internal HTTP connection.
 
 For Cloudflare Tunnel, the relevant settings are:
 
@@ -243,8 +244,10 @@ docker build -t graphite .
 
 Graphite is designed to be safe for public internet exposure when deployed behind HTTPS.
 
+Plain HTTP works for local and LAN use (for example `http://localhost:3000` or `http://192.168.1.20:3000`), but passwords and session cookies then travel unencrypted. Use HTTPS for anything reachable from outside your network.
+
 - **Argon2id** password hashing with OWASP-recommended parameters
-- **Session-based auth** with httpOnly, Secure, SameSite=Lax cookies
+- **Session-based auth** with httpOnly, SameSite=Lax cookies, marked Secure whenever the app is served over HTTPS
 - **CSRF protection** via SameSite cookies + Origin header validation
 - **Rate limiting** on login (10 attempts / 15 min) and globally (300 req / 15 min)
 - **Progressive account lockout** (30s / 5m / 30m delays after failed attempts)

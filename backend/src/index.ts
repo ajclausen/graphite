@@ -11,7 +11,7 @@ import session from 'express-session';
 import { hash, Algorithm } from '@node-rs/argon2';
 import { initializeDatabase } from './db/knex';
 import db from './db/knex';
-import { createSessionConfig, ARGON2_OPTIONS } from './auth/config';
+import { createSessionConfig, resolveCookieSecureMode, ARGON2_OPTIONS } from './auth/config';
 import { resolveSessionSecret } from './auth/sessionSecret';
 import { requireAuth, requireCompletedSetup, csrfProtection } from './auth/middleware';
 import { generateBootstrapPassword } from './routes/auth';
@@ -96,6 +96,11 @@ app.use(helmet({
       ],
       workerSrc: ["'self'", "blob:"], // Required for PDF.js web worker
       connectSrc: ["'self'"],
+      // Helmet adds upgrade-insecure-requests by default, which makes
+      // browsers rewrite every request to https:// on a plain-HTTP origin
+      // such as a LAN IP, so the app never loads. Everything here is
+      // same-origin (or already https), so over HTTPS it adds nothing.
+      upgradeInsecureRequests: null,
     },
   },
 }));
@@ -212,6 +217,7 @@ async function startServer(): Promise<void> {
       {
         port: PORT,
         sessionSecretSource: sessionSecret.source,
+        cookieSecure: resolveCookieSecureMode(),
       },
       'Server running'
     );

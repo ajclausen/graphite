@@ -11,9 +11,13 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - DATA_DIR=/data
-      - SESSION_SECRET=${SESSION_SECRET:?Set SESSION_SECRET in .env or shell (openssl rand -hex 32)}
+      # Optional: if unset, a secret is generated once and persisted to /data/session-secret
+      - SESSION_SECRET=${SESSION_SECRET:-}
       # Set to '1' when running behind a reverse proxy (nginx, Caddy, Traefik)
       - TRUST_PROXY=${TRUST_PROXY:-}
+      # auto: Secure cookies on HTTPS only, so plain-HTTP access (localhost, LAN) can sign in.
+      # true: always Secure (sign-in fails over plain HTTP). false: never Secure.
+      - COOKIE_SECURE=${COOKIE_SECURE:-auto}
       # Set to the public app URL(s) when running behind a reverse proxy or tunnel
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
       # Backward-compatible single-origin setting
