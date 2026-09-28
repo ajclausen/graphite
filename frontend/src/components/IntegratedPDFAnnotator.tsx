@@ -584,7 +584,8 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({
         </div>
 
         <div className="annotator-bar-center">
-          {!isImage && numPages ? (
+          {/* Single-page documents have nowhere to navigate; skip the row */}
+          {!isImage && numPages && numPages > 1 ? (
             <PageNavigator pageNumber={pageNumber} numPages={numPages} onGoToPage={goToPage} />
           ) : null}
         </div>

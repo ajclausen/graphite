@@ -46,8 +46,13 @@
 }
 
 .pm-doc-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.pm-subtitle > span:not(.pm-doc-name) {
+  flex-shrink: 0;
 }
 
 .pm-bar-actions {
