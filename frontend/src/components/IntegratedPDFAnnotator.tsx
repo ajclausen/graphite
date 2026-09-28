@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist/types/src/display/api';
 import { Excalidraw, viewportCoordsToSceneCoords } from '@excalidraw/excalidraw';
 import { pdfjs } from '../utils/pdfWorker';
@@ -9,10 +9,13 @@ import { PDFPageViewLayer } from './PDFPageViewLayer';
 import { ImagePageViewLayer } from './ImagePageViewLayer';
 import { PDFPageManager } from './PDFPageManager';
 import { PDFPageSidebar } from './PDFPageSidebar';
-import { getDocumentPdfUrl, getDocumentFileUrl, updateDocument, listDocuments } from '../api/client';
+import { getDocumentPdfUrl, getDocumentFileUrl, updateDocument } from '../api/client';
 import type { Document } from '../api/client';
 import { ThemeToggle } from './ThemeToggle';
-import { parseTimestamp, pluralize } from '../utils/format';
+import { DocSwitcher } from './DocSwitcher';
+import { Icon } from './ui/Icon';
+import { useAppTheme } from '../utils/theme';
+import { PHONE_QUERY, useMediaQuery } from '../utils/useMediaQuery';
 import './ui/ui.css';
 import './IntegratedPDFAnnotator.css';
 
@@ -45,18 +48,16 @@ const PageNavigator: React.FC<{
   return (
     <div className="page-nav" role="group" aria-label="Page navigation">
       <button
-        className="page-nav-btn"
+        className="g-icon-btn g-icon-btn--sm page-nav-btn"
         onClick={() => onGoToPage(pageNumber - 1)}
         disabled={pageNumber <= 1}
         title="Previous page (Page Up)"
         aria-label="Previous page"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
+        <Icon name="chevronLeft" size={16} />
       </button>
       <label className="page-nav-field">
-        <span className="visually-hidden">Current page</span>
+        <span className="visually-hidden">Page</span>
         <input
           className="page-nav-input"
           inputMode="numeric"
@@ -73,20 +74,19 @@ const PageNavigator: React.FC<{
               e.currentTarget.blur();
             }
           }}
-          style={{ width: `${Math.max(2, String(numPages).length) + 1.2}ch` }}
+          aria-describedby="page-nav-total"
+          style={{ width: `${Math.max(2, String(numPages).length) + 1.4}ch` }}
         />
-        <span className="page-nav-total">/ {numPages}</span>
+        <span className="page-nav-total" id="page-nav-total">of {numPages}</span>
       </label>
       <button
-        className="page-nav-btn"
+        className="g-icon-btn g-icon-btn--sm page-nav-btn"
         onClick={() => onGoToPage(pageNumber + 1)}
         disabled={pageNumber >= numPages}
         title="Next page (Page Down)"
         aria-label="Next page"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
+        <Icon name="chevronRight" size={16} />
       </button>
     </div>
   );
@@ -110,29 +110,23 @@ const SaveIndicator: React.FC<{ status: 'idle' | 'saving' | 'saved' | 'error' }>
     return (
       <span className="save-status save-status-saving" role="status">
         <span className="g-spinner g-spinner--sm" aria-hidden="true" />
-        Saving…
+        <span className="save-status-text">Saving…</span>
       </span>
     );
   }
   if (status === 'error') {
     return (
       <span className="save-status save-status-error" role="alert" title="Your changes are kept in this tab and will be retried automatically.">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" />
-          <line x1="12" y1="8" x2="12" y2="12.5" />
-          <line x1="12" y1="16" x2="12.01" y2="16" />
-        </svg>
-        Not saved · retrying
+        <Icon name="alert" size={14} />
+        <span className="save-status-text">Not saved · retrying</span>
       </span>
     );
   }
   if (status === 'saved') {
     return (
-      <span className={`save-status save-status-saved${showSaved ? '' : ' is-quiet'}`} role="status">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
-        Saved
+      <span className={`save-status save-status-saved${showSaved ? '' : ' is-quiet'}`} role="status" title="All changes saved">
+        <Icon name="cloudCheck" size={16} />
+        <span className="save-status-text">Saved</span>
       </span>
     );
   }
@@ -173,28 +167,49 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({
   const [isInitialViewportReady, setIsInitialViewportReady] = useState(false);
   const [annotationsReady, setAnnotationsReady] = useState(false);
   const [pageManagerOpen, setPageManagerOpen] = useState(false);
-  const [pageSidebarOpen, setPageSidebarOpen] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    const stored = window.localStorage.getItem('graphite:pageSidebarOpen');
-    // Default closed on phones, where it would take half the screen.
-    if (stored === null) return !window.matchMedia?.('(max-width: 760px)').matches;
-    return stored === 'true';
+  const isPhone = useMediaQuery(PHONE_QUERY);
+  const appTheme = useAppTheme();
+  // Desktop: a docked sidebar whose open state is remembered.
+  // Phones: a slide-over drawer that always starts closed.
+  const [dockedSidebarOpen, setDockedSidebarOpen] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('graphite:pageSidebarOpen') !== 'false';
+    } catch {
+      return true;
+    }
   });
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const pageSidebarOpen = isPhone ? drawerOpen : dockedSidebarOpen;
+  const togglePageSidebar = useCallback(() => {
+    if (isPhone) {
+      setDrawerOpen((open) => !open);
+    } else {
+      setDockedSidebarOpen((open) => {
+        try {
+          window.localStorage.setItem('graphite:pageSidebarOpen', String(!open));
+        } catch {
+          // preference just won't persist
+        }
+        return !open;
+      });
+    }
+  }, [isPhone]);
 
   useEffect(() => {
-    window.localStorage.setItem('graphite:pageSidebarOpen', String(pageSidebarOpen));
-  }, [pageSidebarOpen]);
+    if (!drawerOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDrawerOpen(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [drawerOpen]);
 
   const { getAnnotations, setPageMetric, getPageMetric, saveStatus } = useAnnotationStore();
   const annotationContainerRef = useRef<HTMLDivElement | null>(null);
   const pageElementRef = useRef<HTMLDivElement | null>(null);
   const initialFitDoneRef = useRef(false);
   const pendingPageAfterReloadRef = useRef<number | null>(initialPage ?? null);
-  const [allDocuments, setAllDocuments] = useState<Document[]>([]);
-  const [selectorOpen, setSelectorOpen] = useState(false);
-  const [selectorQuery, setSelectorQuery] = useState('');
-  const selectorRef = useRef<HTMLDivElement>(null);
-  const selectorSearchRef = useRef<HTMLInputElement>(null);
+  const [knownDocuments, setKnownDocuments] = useState<Document[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
 
   const [viewport, setViewport] = useState(defaultViewport);
@@ -311,50 +326,6 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
-
-  // Fetch document list for selector (refreshed each time it opens)
-  useEffect(() => {
-    listDocuments().then(setAllDocuments).catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    if (!selectorOpen) {
-      setSelectorQuery('');
-      return;
-    }
-    listDocuments().then(setAllDocuments).catch(console.error);
-    selectorSearchRef.current?.focus();
-  }, [selectorOpen]);
-
-  const selectorDocuments = useMemo(() => {
-    const needle = selectorQuery.trim().toLocaleLowerCase();
-    const recent = [...allDocuments].sort((a, b) => (
-      parseTimestamp(b.last_edited_at ?? b.updated_at).getTime() -
-      parseTimestamp(a.last_edited_at ?? a.updated_at).getTime()
-    ));
-    return needle
-      ? recent.filter((d) => d.original_name.toLocaleLowerCase().includes(needle))
-      : recent;
-  }, [allDocuments, selectorQuery]);
-
-  // Close selector on outside click or Escape
-  useEffect(() => {
-    if (!selectorOpen) return;
-    const handleClick = (e: PointerEvent) => {
-      if (!selectorRef.current?.contains(e.target as Node)) {
-        setSelectorOpen(false);
-      }
-    };
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelectorOpen(false);
-    };
-    document.addEventListener('pointerdown', handleClick);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('pointerdown', handleClick);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [selectorOpen]);
 
   const handlePageLoad = useCallback((page: PDFPageProxy) => {
     const baseViewport = page.getViewport({ scale: 1 });
@@ -570,152 +541,90 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({
 
   const handleDocumentUpdatedFromManager = useCallback((updatedDoc: Document, nextPage: number) => {
     pendingPageAfterReloadRef.current = nextPage;
-    setAllDocuments((prev) => prev.map((item) => (
-      item.id === updatedDoc.id ? updatedDoc : item
-    )));
     onDocumentChange(updatedDoc);
   }, [onDocumentChange]);
 
   const handleDocumentCreatedFromManager = useCallback((newDoc: Document) => {
-    setAllDocuments((prev) => [
-      newDoc,
-      ...prev.filter((item) => item.id !== newDoc.id),
-    ]);
+    setKnownDocuments((prev) => [newDoc, ...prev.filter((item) => item.id !== newDoc.id)]);
   }, []);
 
   const handleDocumentSwitch = useCallback(async (newDoc: Document) => {
-    if (newDoc.id === doc.id) {
-      setSelectorOpen(false);
-      return;
-    }
-    setSelectorOpen(false);
+    if (newDoc.id === doc.id) return;
     await useAnnotationStore.getState().flushAllPendingSaves();
     onDocumentChange(newDoc);
   }, [doc.id, onDocumentChange]);
 
+  const handleSidebarGoToPage = useCallback((page: number) => {
+    goToPage(page);
+    if (isPhone) setDrawerOpen(false);
+  }, [goToPage, isPhone]);
+
   return (
-    <div className="integrated-pdf-annotator">
-      <div className="main-toolbar">
-        <div className="toolbar-left">
-          <button onClick={onBack} className="brand-home" title="Back to library" aria-label="Back to library">
-            <svg className="brand-home-back" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-            <img className="brand-home-mark" src="/logo.png" alt="" />
+    <div className="annotator">
+      <header className="annotator-bar">
+        <h1 className="visually-hidden">{doc.original_name}</h1>
+        <div className="annotator-bar-start">
+          <button onClick={onBack} className="g-icon-btn" title="Back to documents" aria-label="Back to documents">
+            <Icon name="arrowLeft" size={18} />
           </button>
-          <div className="toolbar-divider" />
           {!isImage && (
             <button
-              onClick={() => setPageSidebarOpen((open) => !open)}
-              className={`sidebar-toggle-button${pageSidebarOpen ? ' is-active' : ''}`}
-              title={pageSidebarOpen ? 'Hide page sidebar' : 'Show page sidebar'}
+              onClick={togglePageSidebar}
+              className="g-icon-btn"
+              title={pageSidebarOpen ? 'Hide pages' : 'Show pages'}
+              aria-label="Page thumbnails"
               aria-pressed={pageSidebarOpen}
+              aria-controls={pageSidebarOpen && numPages ? 'page-sidebar' : undefined}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="16" rx="2" />
-                <line x1="9" y1="4" x2="9" y2="20" />
-              </svg>
+              <Icon name="sidebar" size={18} />
             </button>
           )}
-          <div className="toolbar-divider" />
-          <div className="doc-selector" ref={selectorRef}>
-            <button
-              className={`doc-selector-button ${selectorOpen ? 'is-open' : ''}`}
-              onClick={() => setSelectorOpen((prev) => !prev)}
-              title={`${doc.original_name} (switch document)`}
-              aria-haspopup="listbox"
-              aria-expanded={selectorOpen}
-            >
-              <span className="doc-selector-name">{doc.original_name}</span>
-              <svg className="doc-selector-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-            {selectorOpen && (
-              <div className="doc-selector-dropdown">
-                <div className="doc-selector-search">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-                    <circle cx="11" cy="11" r="7" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                  <input
-                    ref={selectorSearchRef}
-                    value={selectorQuery}
-                    onChange={(e) => setSelectorQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && selectorDocuments[0]) {
-                        void handleDocumentSwitch(selectorDocuments[0]);
-                      }
-                    }}
-                    placeholder="Jump to document…"
-                    aria-label="Search documents"
-                  />
-                </div>
-                <div className="doc-selector-header">{selectorQuery ? 'Matches' : 'Recent'}</div>
-                {selectorDocuments.length === 0 ? (
-                  <div className="doc-selector-empty">
-                    {allDocuments.length === 0 ? 'Loading…' : 'No matching documents'}
-                  </div>
-                ) : (
-                  selectorDocuments.map((d) => (
-                    <button
-                      key={d.id}
-                      className={`doc-selector-item ${d.id === doc.id ? 'is-active' : ''}`}
-                      onClick={() => handleDocumentSwitch(d)}
-                    >
-                      <span className="doc-selector-item-name">{d.original_name}</span>
-                      <span className="doc-selector-item-meta">
-                        {d.file_type === 'image' ? 'Image' : d.page_count != null ? pluralize(d.page_count, 'page') : ''}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
+          <DocSwitcher current={doc} knownDocuments={knownDocuments} onSelect={(d) => void handleDocumentSwitch(d)} />
           <SaveIndicator status={saveStatus} />
         </div>
 
-        <div className="toolbar-center">
+        <div className="annotator-bar-center">
           {!isImage && numPages ? (
             <PageNavigator pageNumber={pageNumber} numPages={numPages} onGoToPage={goToPage} />
           ) : null}
         </div>
 
-        <div className="toolbar-right">
+        <div className="annotator-bar-end">
           {!isImage && (
             <button
-              className="manage-pages-button"
+              className="g-btn g-btn--ghost g-btn--sm annotator-pages-btn"
               onClick={() => setPageManagerOpen(true)}
               disabled={!numPages}
-              title="Manage PDF pages"
+              title="Reorder, rotate, insert or delete pages"
+              aria-label="Pages"
+              aria-haspopup="dialog"
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="7" height="7" rx="1" />
-                <rect x="14" y="3" width="7" height="7" rx="1" />
-                <rect x="3" y="14" width="7" height="7" rx="1" />
-                <rect x="14" y="14" width="7" height="7" rx="1" />
-              </svg>
-              <span>Pages</span>
+              <Icon name="pages" size={17} />
+              <span className="annotator-btn-label">Pages</span>
             </button>
           )}
-          <ThemeToggle />
+          <ThemeToggle className="annotator-theme-toggle" />
           <PDFExporter documentId={doc.id} originalName={doc.original_name} numPages={numPages || 1} fileType={doc.file_type} />
         </div>
-      </div>
+      </header>
 
-      <div className="content-area">
-        {pageSidebarOpen && !isImage && numPages ? (
-          <PDFPageSidebar
-            documentId={doc.id}
-            documentUpdatedAt={doc.updated_at}
-            pdfDocument={pdfDocument}
-            numPages={numPages}
-            currentPage={pageNumber}
-            onGoToPage={goToPage}
-          />
+      <div className="annotator-body">
+        {!isImage && numPages && pageSidebarOpen ? (
+          <>
+            {isPhone && <div className="annotator-drawer-backdrop" onClick={() => setDrawerOpen(false)} />}
+            <PDFPageSidebar
+              documentId={doc.id}
+              documentUpdatedAt={doc.updated_at}
+              pdfDocument={pdfDocument}
+              numPages={numPages}
+              currentPage={pageNumber}
+              onGoToPage={handleSidebarGoToPage}
+              variant={isPhone ? 'drawer' : 'docked'}
+              onClose={isPhone ? () => setDrawerOpen(false) : undefined}
+            />
+          </>
         ) : null}
-        <div className="annotation-container" ref={annotationContainerRef}>
+        <main className="annotation-container" id="main" tabIndex={-1} ref={annotationContainerRef} aria-label="Annotation canvas">
           <div
             className="pdf-background"
             style={{
@@ -765,7 +674,7 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({
                   <h2>{loadError}</h2>
                   <p>The file may be damaged, or the server may be unreachable.</p>
                   <div className="annotator-overlay-actions">
-                    <button className="g-btn g-btn--secondary" onClick={onBack}>Back to library</button>
+                    <button className="g-btn g-btn--secondary" onClick={onBack}>Back to documents</button>
                     <button className="g-btn g-btn--primary" onClick={() => setReloadKey((k) => k + 1)}>Try again</button>
                   </div>
                 </div>
@@ -787,7 +696,7 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({
                       <h2>The drawing tools failed to load</h2>
                       <p>Your saved annotations are safe. Reloading the page usually fixes this.</p>
                       <div className="annotator-overlay-actions">
-                        <button className="g-btn g-btn--secondary" onClick={onBack}>Back to library</button>
+                        <button className="g-btn g-btn--secondary" onClick={onBack}>Back to documents</button>
                         <button className="g-btn g-btn--primary" onClick={() => window.location.reload()}>Reload</button>
                       </div>
                     </div>
@@ -796,11 +705,11 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({
               >
                 <Excalidraw
                   key={`${doc.id}-page-${pageNumber}`}
+                  theme={appTheme}
                   initialData={{
                     elements: getCurrentAnnotations(pageNumber),
                     appState: {
                       viewBackgroundColor: 'transparent',
-                      theme: 'light',
                       currentItemStrokeWidth: defaultStrokeWidth,
                       currentItemFontSize: defaultFontSize,
                       scrollX: viewport.scrollX,
@@ -849,7 +758,7 @@ export const IntegratedPDFAnnotator: React.FC<IntegratedPDFAnnotatorProps> = ({
               </ErrorBoundary>
             )}
           </div>
-        </div>
+        </main>
       </div>
 
       {pageManagerOpen && !isImage && numPages && (

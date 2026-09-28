@@ -85,10 +85,10 @@ app.use(helmet({
       styleSrc: [
         "'self'",
         "'unsafe-inline'",
-        "https://fonts.googleapis.com",
       ],
       styleSrcAttr: ["'unsafe-inline'"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      // Fonts are bundled with the frontend; no third-party font hosts.
+      fontSrc: ["'self'"],
       imgSrc: ["'self'", "data:", "blob:"],
       scriptSrc: [
         "'self'",

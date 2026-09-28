@@ -2,6 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { useUIStore, type ToastKind } from '../../store/uiStore';
 import { Modal } from './Modal';
+import { Icon } from './Icon';
 import './ui.css';
 
 const TOAST_ICONS: Record<ToastKind, React.ReactNode> = {
@@ -41,11 +42,8 @@ const Toaster: React.FC = () => {
             <div className="g-toast-message">{t.message}</div>
             {t.description && <div className="g-toast-description">{t.description}</div>}
           </div>
-          <button className="g-toast-close" onClick={() => dismiss(t.id)} aria-label="Dismiss notification">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-              <line x1="6" y1="6" x2="18" y2="18" />
-              <line x1="18" y1="6" x2="6" y2="18" />
-            </svg>
+          <button className="g-toast-close g-icon-btn g-icon-btn--sm" onClick={() => dismiss(t.id)} aria-label="Dismiss notification">
+            <Icon name="x" size={14} />
           </button>
         </div>
       ))}
@@ -61,15 +59,16 @@ const ConfirmHost: React.FC = () => {
   if (!pending) return null;
 
   return (
-    <Modal title={pending.title} description={pending.message} onClose={() => resolve(false)} width={400}>
+    <Modal title={pending.title} description={pending.message} onClose={() => resolve(false)} width={420} role="alertdialog">
       <div className="g-modal-actions">
-        <button className="g-btn g-btn--secondary" onClick={() => resolve(false)}>
+        {/* Destructive confirms start on Cancel so a stray Enter can't delete anything */}
+        <button className="g-btn g-btn--secondary" onClick={() => resolve(false)} data-autofocus={pending.danger ? true : undefined}>
           {pending.cancelLabel ?? 'Cancel'}
         </button>
         <button
           className={`g-btn ${pending.danger ? 'g-btn--danger' : 'g-btn--primary'}`}
           onClick={() => resolve(true)}
-          data-autofocus
+          data-autofocus={pending.danger ? undefined : true}
         >
           {pending.confirmLabel ?? 'Confirm'}
         </button>

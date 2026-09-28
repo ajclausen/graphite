@@ -27,7 +27,9 @@ It runs as a single Docker container with an embedded SQLite database. No extern
 - **Export** — Save annotated documents as flattened PDFs or PNG images
 - **Document library** — Upload, rename, browse, and manage documents in list or grid view
 - **Multi-user with auth** — Session-based authentication, admin panel, role-based access
-- **Dark and light themes** — Toggle between themes with persisted preference
+- **Dark and light themes** — Follows your OS on first visit, with a persisted toggle
+- **Mobile friendly** — Phone layouts with bottom sheets, a slide-over page drawer and 44px touch targets
+- **Accessible** — WCAG 2.2 AA color contrast across Graphite's own UI, full keyboard support (including page reordering), screen reader labels and announcements
 - **Self-contained** — Single Docker container, SQLite database, filesystem storage
 - **Auto-save** — Annotations save automatically as you draw
 
@@ -265,4 +267,4 @@ Plain HTTP works for local and LAN use (for example `http://localhost:3000` or `
 
 - [Excalidraw](https://excalidraw.com) for the drawing engine
 - [PDF.js](https://mozilla.github.io/pdf.js/) via react-pdf for document rendering
-- [Outfit](https://fonts.google.com/specimen/Outfit) and [Instrument Serif](https://fonts.google.com/specimen/Instrument+Serif) typefaces
+- [Inter](https://rsms.me/inter/) and [Instrument Serif](https://fonts.google.com/specimen/Instrument+Serif) typefaces, bundled via Fontsource (no third-party font requests)

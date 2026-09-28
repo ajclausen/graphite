@@ -8,6 +8,7 @@ import { ChangePasswordPage } from './components/ChangePasswordPage';
 import { AdminPage } from './components/AdminPage';
 import { AppHeader } from './components/AppHeader';
 import { GlobalOverlays } from './components/ui/Overlays';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useAnnotationStore } from './store/annotationStore';
 import { useAuthStore } from './store/authStore';
 import { toast } from './store/uiStore';
@@ -150,7 +151,7 @@ function AppContent() {
   return (
     <div className="app">
       <AppHeader user={user} current={isAdminView ? 'admin' : 'library'} onLogout={handleLogout} />
-      <main className="app-main">
+      <main className="app-main" id="main" tabIndex={-1}>
         {isAdminView ? (
           <AdminPage />
         ) : (
@@ -163,10 +164,10 @@ function AppContent() {
 
 function App() {
   return (
-    <>
+    <ErrorBoundary>
       <AppContent />
       <GlobalOverlays />
-    </>
+    </ErrorBoundary>
   );
 }
 

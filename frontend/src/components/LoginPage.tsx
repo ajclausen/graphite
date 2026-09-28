@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { BrandMark } from './AppHeader';
+import { PasswordInput } from './ui/PasswordInput';
+import { Icon } from './ui/Icon';
 import './AuthPages.css';
 
 export const LoginPage: React.FC = () => {
@@ -8,68 +11,80 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const login = useAuthStore((s) => s.login);
+  const errorId = useId();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email.trim(), password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      const message = err instanceof Error ? err.message : '';
+      setError(/too many/i.test(message)
+        ? 'Too many sign-in attempts. Wait a few minutes and try again.'
+        : message || 'Sign-in failed. Check your email and password.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-page">
+    <main className="auth-page" id="main">
       <div className="auth-card">
-        <div className="auth-brand">
-          <img className="auth-brand-mark" src="/logo.png" alt="Graphite logo" />
-          <div className="auth-brand-text">
-            <h1>Graphite</h1>
-            <p className="auth-tagline">annotate &middot; sketch &middot; export</p>
-          </div>
-        </div>
+        <div className="auth-brand"><BrandMark /></div>
+        <h1 className="auth-title">Sign in</h1>
+        <p className="auth-subtitle">Welcome back. Sign in to open your documents.</p>
 
-        <h2 className="auth-title">Sign in</h2>
+        <form className="g-form auth-form" onSubmit={handleSubmit} noValidate={false}>
+          {error && (
+            <div className="g-alert" role="alert" id={errorId}>
+              <Icon name="alert" size={16} />
+              <span>{error}</span>
+            </div>
+          )}
 
-        <form className="auth-form" onSubmit={handleSubmit}>
-          {error && <div className="auth-error">{error}</div>}
-
-          <label className="auth-label">
-            Email
+          <div className="g-field">
+            <label className="g-label" htmlFor="login-email">Email</label>
             <input
-              className="auth-input"
+              id="login-email"
+              className="g-input"
               type="email"
+              inputMode="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
               autoFocus
-              autoComplete="email"
+              autoComplete="username"
+              autoCapitalize="off"
+              spellCheck={false}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? errorId : undefined}
             />
-          </label>
+          </div>
 
-          <label className="auth-label">
-            Password
-            <input
-              className="auth-input"
-              type="password"
+          <div className="g-field">
+            <label className="g-label" htmlFor="login-password">Password</label>
+            <PasswordInput
+              id="login-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
               required
               autoComplete="current-password"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? errorId : undefined}
             />
-          </label>
+          </div>
 
-          <button className="auth-submit" type="submit" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign in'}
+          <button className="g-btn g-btn--primary g-btn--block auth-submit" type="submit" disabled={loading}>
+            {loading && <span className="g-spinner g-spinner--sm auth-spinner" aria-hidden="true" />}
+            {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+
+        <p className="auth-footnote">Forgot your password? Ask an administrator to reset it.</p>
       </div>
-    </div>
+    </main>
   );
 };

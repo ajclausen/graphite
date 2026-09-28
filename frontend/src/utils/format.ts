@@ -43,3 +43,22 @@ export function formatRelative(value: string, now = Date.now()): string {
 export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
+
+/** Compact form for tight spaces: "just now", "12m ago", "3h ago", "5d ago", then a date. */
+export function formatRelativeShort(value: string, now = Date.now()): string {
+  const date = parseTimestamp(value);
+  const seconds = Math.round((now - date.getTime()) / 1000);
+  if (seconds < 45) return 'just now';
+  if (seconds < 3600) return `${Math.max(1, Math.round(seconds / 60))}m ago`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`;
+  if (seconds < 7 * 86400) return `${Math.round(seconds / 86400)}d ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/** Two-letter avatar initials from a display name or the email's local part. */
+export function getInitials(user: { displayName?: string | null; email?: string } | null): string {
+  const source = user?.displayName?.trim() || user?.email?.split('@')[0] || '?';
+  const parts = source.split(/[\s._-]+/).filter(Boolean);
+  const initials = parts.length > 1 ? parts[0][0] + parts[1][0] : source.slice(0, 2);
+  return initials.toUpperCase();
+}

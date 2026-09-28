@@ -5,6 +5,8 @@ import { pdfjs } from '../utils/pdfWorker';
 import { useAnnotationStore, flushPendingAnnotations } from '../store/annotationStore';
 import { getDocumentPdfUrl, getDocumentFileUrl } from '../api/client';
 import { toast } from '../store/uiStore';
+import { Menu } from './ui/Menu';
+import { Icon } from './ui/Icon';
 
 interface PDFExporterProps {
   documentId: string;
@@ -70,34 +72,6 @@ async function loadImageFromBlob(blob: Blob): Promise<HTMLImageElement> {
 export const PDFExporter: React.FC<PDFExporterProps> = ({ documentId, originalName, numPages, fileType }) => {
   const [isExporting, setIsExporting] = React.useState(false);
   const [progress, setProgress] = React.useState<{ done: number; total: number } | null>(null);
-  const [menuOpen, setMenuOpen] = React.useState(false);
-  const menuRef = React.useRef<HTMLDivElement | null>(null);
-
-  React.useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [menuOpen]);
-
   const createImageExportCanvas = React.useCallback(async () => {
     const { annotations, pageMetrics } = useAnnotationStore.getState();
     const imageUrl = getDocumentFileUrl(documentId);
@@ -212,7 +186,6 @@ export const PDFExporter: React.FC<PDFExporterProps> = ({ documentId, originalNa
 
   const exportHighQualityPDF = async (format: ImageExportFormat = 'pdf') => {
     setIsExporting(true);
-    setMenuOpen(false);
     try {
       flushPendingAnnotations();
 
@@ -332,48 +305,49 @@ export const PDFExporter: React.FC<PDFExporterProps> = ({ documentId, originalNa
     }
   };
 
-  if (fileType === 'image') {
-    return (
-      <div className="export-menu" ref={menuRef}>
-        <button
-          className="export-btn"
-          onClick={() => setMenuOpen((open) => !open)}
-          disabled={isExporting}
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-        >
-          {isExporting ? 'Exporting…' : 'Export'}
-        </button>
-        {menuOpen && !isExporting && (
-          <div className="export-menu-dropdown" role="menu">
-            <button className="export-menu-item" onClick={() => exportHighQualityPDF('pdf')} role="menuitem">
-              Export as PDF
-            </button>
-            <button className="export-menu-item" onClick={() => exportHighQualityPDF('png')} role="menuitem">
-              Export as PNG
-            </button>
-            <button className="export-menu-item" onClick={() => exportHighQualityPDF('jpg')} role="menuitem">
-              Export as JPG
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   const exportingLabel = progress && progress.total > 1
     ? `Exporting ${Math.min(progress.done + 1, progress.total)}/${progress.total}…`
     : 'Exporting…';
 
+  const buttonContent = isExporting ? (
+    <>
+      <span className="g-spinner g-spinner--sm export-spinner" aria-hidden="true" />
+      <span className="export-label">{exportingLabel}</span>
+    </>
+  ) : (
+    <>
+      <Icon name="download" size={16} />
+      <span className="export-label">{fileType === 'image' ? 'Export' : 'Export PDF'}</span>
+    </>
+  );
+
+  if (fileType === 'image') {
+    return (
+      <Menu
+        items={[
+          { id: 'pdf', label: 'Export as PDF', icon: 'file', onSelect: () => void exportHighQualityPDF('pdf') },
+          { id: 'png', label: 'Export as PNG', icon: 'image', onSelect: () => void exportHighQualityPDF('png') },
+          { id: 'jpg', label: 'Export as JPG', icon: 'image', onSelect: () => void exportHighQualityPDF('jpg') },
+        ]}
+        header={{ title: 'Export with annotations' }}
+        renderTrigger={(props) => (
+          <button {...props} className="g-btn g-btn--primary g-btn--sm export-btn" disabled={isExporting} aria-live="polite">
+            {buttonContent}
+          </button>
+        )}
+      />
+    );
+  }
+
   return (
     <button
-      className="export-btn"
+      className="g-btn g-btn--primary g-btn--sm export-btn"
       onClick={() => exportHighQualityPDF('pdf')}
       disabled={isExporting}
       title="Download a flattened PDF with your annotations"
       aria-live="polite"
     >
-      {isExporting ? exportingLabel : 'Export PDF'}
+      {buttonContent}
     </button>
   );
 };

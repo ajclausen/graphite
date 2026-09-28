@@ -9,14 +9,17 @@ interface ModalProps {
   /** Blocks Escape/backdrop dismissal while an operation is in flight. */
   busy?: boolean;
   width?: number;
+  /** Use "alertdialog" for confirmations that interrupt the user. */
+  role?: 'dialog' | 'alertdialog';
   children?: React.ReactNode;
 }
 
 const FOCUSABLE = 'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])';
 
-export const Modal: React.FC<ModalProps> = ({ title, description, onClose, busy = false, width = 420, children }) => {
+export const Modal: React.FC<ModalProps> = ({ title, description, onClose, busy = false, width = 440, role = 'dialog', children }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  const descriptionId = useId();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const busyRef = useRef(busy);
@@ -72,14 +75,15 @@ export const Modal: React.FC<ModalProps> = ({ title, description, onClose, busy 
       <div
         ref={dialogRef}
         className="g-modal"
-        role="dialog"
+        role={role}
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         style={{ width: `min(100%, ${width}px)` }}
       >
         <h2 id={titleId} className="g-modal-title">{title}</h2>
-        {description && <div className="g-modal-description">{description}</div>}
+        {description && <div id={descriptionId} className="g-modal-description">{description}</div>}
         {children}
       </div>
     </div>,

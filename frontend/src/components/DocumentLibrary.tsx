@@ -12,9 +12,12 @@ import {
   getDocumentFileUrl,
 } from '../api/client';
 import { PDF_DOCUMENT_OPTIONS } from '../utils/pdfOptions';
-import { formatDate, formatFileSize, formatRelative, parseTimestamp, pluralize } from '../utils/format';
+import { formatDate, formatFileSize, formatRelative, formatRelativeShort, parseTimestamp, pluralize } from '../utils/format';
 import { confirmDialog, toast, errorMessage } from '../store/uiStore';
+import { PHONE_QUERY, useMediaQuery } from '../utils/useMediaQuery';
 import { Modal } from './ui/Modal';
+import { Menu, type MenuItemDef } from './ui/Menu';
+import { Icon } from './ui/Icon';
 import './DocumentLibrary.css';
 
 const ACCEPTED_TYPES = new Set([
@@ -209,28 +212,28 @@ function readStoredSort(): SortKey {
   return 'edited';
 }
 
-const FileIcon: React.FC<{ type: Document['file_type']; size?: number }> = ({ type, size = 16 }) => (
-  type === 'image' ? (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-      <circle cx="8.5" cy="8.5" r="1.5" />
-      <polyline points="21 15 16 10 5 21" />
-    </svg>
-  ) : (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-    </svg>
-  )
-);
+const DocThumb: React.FC<{ doc: Document; className: string; iconSize: number }> = ({ doc, className, iconSize }) => {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className={className} aria-hidden="true">
+      {doc.thumbnail_path && !failed ? (
+        <img src={getDocumentThumbnailUrl(doc.id)} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
+      ) : (
+        <Icon name={doc.file_type === 'image' ? 'image' : 'file'} size={iconSize} strokeWidth={1.6} />
+      )}
+    </span>
+  );
+};
 
-const UploadIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="17 8 12 3 7 8" />
-    <line x1="12" y1="3" x2="12" y2="15" />
-  </svg>
-);
+function describeDoc(doc: Document): string {
+  const kind = doc.file_type === 'image' ? 'Image' : doc.page_count != null ? pluralize(doc.page_count, 'page') : 'PDF';
+  return `${kind} · ${formatFileSize(doc.file_size)} · ${formatRelativeShort(doc.last_edited_at ?? doc.updated_at)}`;
+}
+
+/** Plain left-clicks open in-app; modified clicks keep native link behavior (new tab, etc.). */
+function isPlainClick(event: React.MouseEvent) {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+}
 
 export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSelect }) => {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -245,7 +248,6 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
     error: string | null;
   } | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [menuDocId, setMenuDocId] = useState<string | null>(null);
   const [renameDoc, setRenameDoc] = useState<Document | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [renaming, setRenaming] = useState(false);
@@ -259,12 +261,13 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
       return 'list';
     }
   });
+  const [announcement, setAnnouncement] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const pageRangeInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
+  const isPhone = useMediaQuery(PHONE_QUERY);
 
   const uploading = uploadProgress !== null;
   const busy = uploading || preparingPdf;
@@ -303,46 +306,33 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
     return sortDocuments(filtered, sortKey);
   }, [documents, query, sortKey]);
 
+  // Tell screen reader users how many results the search left.
+  useEffect(() => {
+    if (!query.trim()) {
+      setAnnouncement('');
+      return;
+    }
+    const timer = setTimeout(() => {
+      setAnnouncement(visibleDocuments.length === 0
+        ? 'No matching documents'
+        : `${pluralize(visibleDocuments.length, 'matching document')}`);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [query, visibleDocuments.length]);
+
   // "/" focuses search, like most document browsers.
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
-      if (document.querySelector('[role="dialog"]')) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
       event.preventDefault();
       searchInputRef.current?.focus();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
-
-  useEffect(() => {
-    if (!menuDocId) {
-      return;
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (menuRef.current?.contains(target)) {
-        return;
-      }
-      setMenuDocId(null);
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setMenuDocId(null);
-      }
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [menuDocId]);
 
   useEffect(() => {
     if (!renameDoc) return;
@@ -487,9 +477,7 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
     void handleFiles(Array.from(e.dataTransfer.files));
   }, [handleFiles]);
 
-  const handleDelete = useCallback(async (e: React.MouseEvent, doc: Document) => {
-    e.stopPropagation();
-    setMenuDocId(null);
+  const handleDelete = useCallback(async (doc: Document) => {
     const confirmed = await confirmDialog({
       title: 'Delete this document?',
       message: `“${doc.original_name}” and all of its annotations will be permanently deleted.`,
@@ -508,10 +496,7 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
     }
   }, []);
 
-  const handleDownload = useCallback((e: React.MouseEvent, doc: Document) => {
-    e.stopPropagation();
-    setMenuDocId(null);
-
+  const handleDownload = useCallback((doc: Document) => {
     const link = window.document.createElement('a');
     link.href = getDocumentFileUrl(doc.id);
     link.download = doc.original_name;
@@ -521,13 +506,6 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
     link.remove();
   }, []);
 
-  const openRenameDialog = useCallback((e: React.MouseEvent, doc: Document) => {
-    e.stopPropagation();
-    setMenuDocId(null);
-    setRenameDoc(doc);
-    setRenameValue(doc.original_name);
-  }, []);
-
   const closeRenameDialog = useCallback(() => {
     setRenameDoc(null);
     setRenameValue('');
@@ -535,9 +513,7 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
 
   const handleRenameSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!renameDoc) {
-      return;
-    }
+    if (!renameDoc) return;
 
     const nextName = normalizeDocumentName(renameValue, renameDoc.original_name);
     if (!nextName) {
@@ -569,77 +545,41 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
     }
   }, [closeRenameDialog, renameDoc, renameValue]);
 
-  const openOnKey = (doc: Document) => (event: React.KeyboardEvent) => {
-    if (event.target !== event.currentTarget) return;
-    if (event.key === 'Enter' || event.key === ' ') {
+  const menuItemsFor = (doc: Document): MenuItemDef[] => [
+    { id: 'open', label: 'Open', icon: 'open', onSelect: () => onDocumentSelect(doc) },
+    {
+      id: 'rename',
+      label: 'Rename',
+      icon: 'pencil',
+      onSelect: () => {
+        setRenameDoc(doc);
+        setRenameValue(doc.original_name);
+      },
+    },
+    { id: 'download', label: 'Download original', icon: 'download', onSelect: () => handleDownload(doc) },
+    { id: 'delete', label: 'Delete', icon: 'trash', danger: true, separatorBefore: true, onSelect: () => void handleDelete(doc) },
+  ];
+
+  const renderMenu = (doc: Document, className: string) => (
+    <Menu
+      items={menuItemsFor(doc)}
+      header={isPhone ? { title: doc.original_name, subtitle: describeDoc(doc) } : undefined}
+      renderTrigger={(props) => (
+        <button {...props} className={`g-icon-btn ${className}`} aria-label={`More actions for ${doc.original_name}`}>
+          <Icon name="moreVertical" size={18} />
+        </button>
+      )}
+    />
+  );
+
+  const openLinkProps = (doc: Document) => ({
+    href: `#/d/${encodeURIComponent(doc.id)}`,
+    onClick: (event: React.MouseEvent) => {
+      if (!isPlainClick(event)) return;
       event.preventDefault();
       onDocumentSelect(doc);
-    }
-  };
-
-  const renderMenu = (doc: Document) => (
-    <div className="library-menu" role="menu" onClick={(e) => e.stopPropagation()}>
-      <button className="library-menu-item" onClick={() => onDocumentSelect(doc)} role="menuitem">
-        Open
-      </button>
-      <button className="library-menu-item" onClick={(e) => openRenameDialog(e, doc)} role="menuitem">
-        Rename
-      </button>
-      <button className="library-menu-item" onClick={(e) => handleDownload(e, doc)} role="menuitem">
-        Download original
-      </button>
-      <div className="library-menu-divider" />
-      <button
-        className="library-menu-item danger"
-        onClick={(e) => handleDelete(e, doc)}
-        role="menuitem"
-      >
-        Delete
-      </button>
-    </div>
-  );
-
-  const renderMenuButton = (doc: Document, className: string) => (
-    <button
-      className={`${className} ${menuDocId === doc.id ? 'is-open' : ''}`}
-      onClick={(e) => {
-        e.stopPropagation();
-        setMenuDocId((current) => (current === doc.id ? null : doc.id));
-      }}
-      onKeyDown={(e) => e.stopPropagation()}
-      title="More actions"
-      aria-label={`More actions for ${doc.original_name}`}
-      aria-haspopup="menu"
-      aria-expanded={menuDocId === doc.id}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <circle cx="12" cy="5" r="1.8" />
-        <circle cx="12" cy="12" r="1.8" />
-        <circle cx="12" cy="19" r="1.8" />
-      </svg>
-    </button>
-  );
-
-  const renderSortHeader = (key: SortKey, label: string, className: string) => (
-    <span
-      className={`list-col ${className}`}
-      role="columnheader"
-      aria-sort={sortKey === key ? (key === 'name' ? 'ascending' : 'descending') : undefined}
-    >
-      <button
-        className={`list-sort-btn${sortKey === key ? ' is-active' : ''}`}
-        onClick={() => setSortKey(key)}
-        title={`Sort by ${SORT_LABELS[key].toLowerCase()}`}
-      >
-        {label}
-        {sortKey === key && (
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
-            {key === 'name' ? <polyline points="6 15 12 9 18 15" /> : <polyline points="6 9 12 15 18 9" />}
-          </svg>
-        )}
-      </button>
-    </span>
-  );
+    },
+  });
 
   const pendingPdfSelection = pendingPdfImport
     ? parsePageRange(pendingPdfImport.rangeText, pendingPdfImport.pageCount)
@@ -651,25 +591,23 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
 
   const renderContent = () => {
     if (loading) {
-      return viewMode === 'list' ? (
-        <div className="library-list" aria-busy="true" aria-label="Loading documents">
-          {Array.from({ length: 5 }, (_, i) => (
-            <div key={i} className="library-skeleton-row">
-              <span className="library-skeleton library-skeleton--thumb" />
-              <span className="library-skeleton" style={{ width: `${40 - i * 4}%` }} />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="library-grid" aria-busy="true" aria-label="Loading documents">
-          {Array.from({ length: 6 }, (_, i) => (
-            <div key={i} className="library-card library-card--skeleton">
-              <div className="library-card-thumbnail library-skeleton" />
-              <div className="library-card-info">
-                <span className="library-skeleton" style={{ width: '70%' }} />
-                <span className="library-skeleton" style={{ width: '45%', marginTop: '0.5rem' }} />
+      return (
+        <div className={viewMode === 'list' ? 'doc-list' : 'doc-grid'} role="status" aria-label="Loading documents">
+          {Array.from({ length: viewMode === 'list' ? 5 : 8 }, (_, i) => (
+            viewMode === 'list' ? (
+              <div key={i} className="doc-row doc-row--skeleton">
+                <span className="g-skeleton doc-row-thumb" />
+                <span className="g-skeleton" style={{ height: 12, width: `${45 - i * 5}%` }} />
               </div>
-            </div>
+            ) : (
+              <div key={i} className="doc-card doc-card--skeleton">
+                <span className="g-skeleton doc-card-thumb" />
+                <span className="doc-card-body">
+                  <span className="g-skeleton" style={{ height: 12, width: '70%' }} />
+                  <span className="g-skeleton" style={{ height: 10, width: '45%', marginTop: 8 }} />
+                </span>
+              </div>
+            )
           ))}
         </div>
       );
@@ -677,249 +615,146 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
 
     if (loadFailed && documents.length === 0) {
       return (
-        <div className="library-empty">
-          <h2 className="library-empty-title">Couldn’t load your documents</h2>
-          <p className="library-empty-hint">Check your connection and try again.</p>
-          <button className="g-btn g-btn--secondary" onClick={() => { setLoading(true); void loadDocuments(); }}>
-            Retry
-          </button>
+        <div className="g-empty" role="alert">
+          <div className="g-empty-icon"><Icon name="alert" size={24} /></div>
+          <h2 className="g-empty-title">Couldn’t load your documents</h2>
+          <p className="g-empty-text">Check your connection and try again.</p>
+          <div className="g-empty-actions">
+            <button className="g-btn g-btn--secondary" onClick={() => { setLoading(true); void loadDocuments(); }}>
+              Try again
+            </button>
+          </div>
         </div>
       );
     }
 
     if (documents.length === 0) {
       return (
-        <div className="library-empty">
-          <div className="library-empty-icon">
-            <FileIcon type="pdf" size={28} />
-          </div>
-          <h2 className="library-empty-title">Your library is empty</h2>
-          <p className="library-empty-hint">
-            Upload a PDF or image to start annotating, or drop files anywhere on this page.
-          </p>
-          <button className="library-upload-btn" onClick={() => fileInputRef.current?.click()} disabled={busy}>
-            <UploadIcon />
-            {uploadLabel}
-          </button>
-        </div>
+        <button type="button" className="library-dropzone" onClick={() => fileInputRef.current?.click()} disabled={busy}>
+          <span className="g-empty-icon"><Icon name="upload" size={24} /></span>
+          <span className="g-empty-title">Add your first document</span>
+          <span className="g-empty-text">
+            {isPhone ? 'Tap to choose a PDF or image.' : 'Drop PDFs or images here, or click to browse.'}
+          </span>
+          <span className="library-dropzone-types">PDF · PNG · JPG · WebP</span>
+        </button>
       );
     }
 
     if (visibleDocuments.length === 0) {
       return (
-        <div className="library-empty">
-          <h2 className="library-empty-title">No matches</h2>
-          <p className="library-empty-hint">Nothing in your library matches “{query.trim()}”.</p>
-          <button className="g-btn g-btn--secondary" onClick={() => { setQuery(''); searchInputRef.current?.focus(); }}>
-            Clear search
-          </button>
+        <div className="g-empty">
+          <div className="g-empty-icon"><Icon name="search" size={24} /></div>
+          <h2 className="g-empty-title">No matches</h2>
+          <p className="g-empty-text">Nothing in your library matches “{query.trim()}”.</p>
+          <div className="g-empty-actions">
+            <button className="g-btn g-btn--secondary" onClick={() => { setQuery(''); searchInputRef.current?.focus(); }}>
+              Clear search
+            </button>
+          </div>
         </div>
       );
     }
 
     if (viewMode === 'list') {
       return (
-        <div className="library-list" role="table" aria-label="Documents">
-          <div className="library-list-header" role="row">
-            {renderSortHeader('name', 'Name', 'col-name')}
-            <span className="list-col col-pages" role="columnheader">Pages</span>
-            {renderSortHeader('size', 'Size', 'col-size')}
-            {renderSortHeader('edited', 'Edited', 'col-modified')}
-            {renderSortHeader('created', 'Added', 'col-created')}
-            <span className="list-col col-actions" role="columnheader"><span className="visually-hidden">Actions</span></span>
+        <div className="doc-list">
+          <div className="doc-list-header" aria-hidden="true">
+            <span>Name</span>
+            <span>Pages</span>
+            <span>Size</span>
+            <span>Edited</span>
+            <span />
           </div>
-          {visibleDocuments.map((doc) => (
-            <div
-              key={doc.id}
-              className={`library-list-row${recentId === doc.id ? ' is-new' : ''}${menuDocId === doc.id ? ' has-menu' : ''}`}
-              role="row"
-              tabIndex={0}
-              onClick={() => onDocumentSelect(doc)}
-              onKeyDown={openOnKey(doc)}
-              aria-label={`Open ${doc.original_name}`}
-            >
-              <span className="list-col col-name" role="cell">
-                <span className="list-thumb" aria-hidden="true">
-                  {doc.thumbnail_path ? (
-                    <img src={getDocumentThumbnailUrl(doc.id)} alt="" loading="lazy" />
-                  ) : (
-                    <FileIcon type={doc.file_type} size={14} />
-                  )}
+          <ul className="doc-list-items" aria-label="Documents">
+            {visibleDocuments.map((doc) => (
+              <li key={doc.id} className={`doc-row${recentId === doc.id ? ' is-new' : ''}`}>
+                <DocThumb doc={doc} className="doc-row-thumb" iconSize={16} />
+                <span className="doc-row-main">
+                  <a className="doc-row-link" {...openLinkProps(doc)} title={doc.original_name}>
+                    {doc.original_name}
+                  </a>
+                  <span className="doc-row-meta">{describeDoc(doc)}</span>
                 </span>
-                <span className="list-name-text" title={doc.original_name}>
-                  {doc.original_name}
+                <span className="doc-row-col">
+                  {doc.file_type === 'image' ? 'Image' : (doc.page_count ?? '–')}
                 </span>
-              </span>
-              <span className="list-col col-pages" role="cell">{doc.file_type === 'image' ? 'Image' : (doc.page_count ?? '–')}</span>
-              <span className="list-col col-size" role="cell">{formatFileSize(doc.file_size)}</span>
-              <span className="list-col col-modified" role="cell" title={formatDate(doc.last_edited_at ?? doc.updated_at)}>
-                {formatRelative(doc.last_edited_at ?? doc.updated_at)}
-              </span>
-              <span className="list-col col-created" role="cell">{formatDate(doc.created_at)}</span>
-              <div
-                className="list-col col-actions"
-                role="cell"
-                ref={menuDocId === doc.id ? menuRef : null}
-              >
-                {renderMenuButton(doc, 'library-list-menu-btn')}
-                {menuDocId === doc.id && renderMenu(doc)}
-              </div>
-            </div>
-          ))}
+                <span className="doc-row-col">{formatFileSize(doc.file_size)}</span>
+                <span className="doc-row-col" title={formatDate(doc.last_edited_at ?? doc.updated_at)}>
+                  {formatRelative(doc.last_edited_at ?? doc.updated_at)}
+                </span>
+                {renderMenu(doc, 'doc-row-menu')}
+              </li>
+            ))}
+          </ul>
         </div>
       );
     }
 
     return (
-      <div className="library-grid">
+      <ul className="doc-grid" aria-label="Documents">
         {visibleDocuments.map((doc, index) => (
-          <div
+          <li
             key={doc.id}
-            className={`library-card${recentId === doc.id ? ' is-new' : ''}${menuDocId === doc.id ? ' has-menu' : ''}`}
+            className={`doc-card${recentId === doc.id ? ' is-new' : ''}`}
             style={{ '--card-i': Math.min(index, 12) } as React.CSSProperties}
-            tabIndex={0}
-            onClick={() => onDocumentSelect(doc)}
-            onKeyDown={openOnKey(doc)}
-            aria-label={`Open ${doc.original_name}`}
           >
-            <div className="library-card-thumbnail">
-              {doc.thumbnail_path ? (
-                <img
-                  src={getDocumentThumbnailUrl(doc.id)}
-                  alt=""
-                  loading="lazy"
-                />
-              ) : (
-                <div className="library-card-placeholder">
-                  <FileIcon type={doc.file_type} size={32} />
-                </div>
-              )}
-            </div>
-            <div className="library-card-info">
-              <div className="library-card-name" title={doc.original_name}>
+            <DocThumb doc={doc} className="doc-card-thumb" iconSize={32} />
+            <span className="doc-card-body">
+              <a className="doc-card-link" {...openLinkProps(doc)} title={doc.original_name}>
                 {doc.original_name}
-              </div>
-              <div className="library-card-meta">
-                {doc.file_type === 'pdf' && doc.page_count != null && <span>{pluralize(doc.page_count, 'page')}</span>}
-                {doc.file_type === 'image' && <span>Image</span>}
-                <span>{formatFileSize(doc.file_size)}</span>
-                <span title={formatDate(doc.last_edited_at ?? doc.updated_at)}>
-                  {formatRelative(doc.last_edited_at ?? doc.updated_at)}
-                </span>
-              </div>
-            </div>
-            <div
-              className="library-card-menu-container"
-              ref={menuDocId === doc.id ? menuRef : null}
-            >
-              {renderMenuButton(doc, 'library-card-menu-button')}
-              {menuDocId === doc.id && renderMenu(doc)}
-            </div>
-          </div>
+              </a>
+              <span className="doc-card-meta">{describeDoc(doc)}</span>
+            </span>
+            {renderMenu(doc, 'doc-card-menu')}
+          </li>
         ))}
-      </div>
+      </ul>
     );
   };
 
   return (
     <div
-      className={`library-container ${dragOver ? 'is-dragging' : ''}`}
-      onDragEnter={(e) => { e.preventDefault(); dragCounterRef.current++; setDragOver(true); }}
+      className={`page library${dragOver ? ' is-dragging' : ''}`}
+      onDragEnter={(e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        dragCounterRef.current++;
+        setDragOver(true);
+      }}
       onDragOver={(e) => e.preventDefault()}
-      onDragLeave={(e) => { e.preventDefault(); dragCounterRef.current--; if (dragCounterRef.current <= 0) { dragCounterRef.current = 0; setDragOver(false); } }}
+      onDragLeave={(e) => {
+        e.preventDefault();
+        dragCounterRef.current--;
+        if (dragCounterRef.current <= 0) {
+          dragCounterRef.current = 0;
+          setDragOver(false);
+        }
+      }}
       onDrop={handleDrop}
     >
-      <div className="library-toolbar">
-        <div className="library-toolbar-left">
-          <h2 className="library-title">
-            Documents
-            {!loading && documents.length > 0 && <span className="library-count">{documents.length}</span>}
-          </h2>
-        </div>
-
-        <div className="library-toolbar-right">
-          {documents.length > 0 && (
-            <>
-              <div className="library-search">
-                <svg className="library-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-                  <circle cx="11" cy="11" r="7" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                <input
-                  ref={searchInputRef}
-                  className="library-search-input"
-                  type="search"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      setQuery('');
-                      e.currentTarget.blur();
-                    }
-                  }}
-                  placeholder="Search"
-                  aria-label="Search documents"
-                />
-                {!query && <kbd className="g-kbd library-search-kbd" aria-hidden="true">/</kbd>}
-              </div>
-
-              <label className="library-sort">
-                <span className="visually-hidden">Sort by</span>
-                <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
-                  {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
-                    <option key={key} value={key}>{SORT_LABELS[key]}</option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="library-view-toggle" role="group" aria-label="View">
-                <button
-                  className={viewMode === 'list' ? 'active' : ''}
-                  onClick={() => setViewMode('list')}
-                  title="List view"
-                  aria-label="List view"
-                  aria-pressed={viewMode === 'list'}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                    <line x1="4" y1="6" x2="20" y2="6" />
-                    <line x1="4" y1="12" x2="20" y2="12" />
-                    <line x1="4" y1="18" x2="20" y2="18" />
-                  </svg>
-                </button>
-                <button
-                  className={viewMode === 'grid' ? 'active' : ''}
-                  onClick={() => setViewMode('grid')}
-                  title="Grid view"
-                  aria-label="Grid view"
-                  aria-pressed={viewMode === 'grid'}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                    <rect x="3" y="3" width="7" height="7" rx="1" />
-                    <rect x="14" y="3" width="7" height="7" rx="1" />
-                    <rect x="3" y="14" width="7" height="7" rx="1" />
-                    <rect x="14" y="14" width="7" height="7" rx="1" />
-                  </svg>
-                </button>
-              </div>
-            </>
+      <div className="page-header">
+        <h1 className="page-title">
+          Documents
+          {!loading && documents.length > 0 && (
+            <span className="g-badge" aria-label={`${documents.length} total`}>{documents.length}</span>
           )}
-
-          <button
-            className="library-upload-btn"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={busy}
-            aria-label={uploadLabel}
-          >
-            {busy ? <span className="g-spinner g-spinner--sm library-upload-spinner" /> : <UploadIcon />}
-            <span className="library-upload-label">{uploadLabel}</span>
-          </button>
-        </div>
+        </h1>
+        <button
+          className="g-btn g-btn--primary library-upload"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={busy}
+          aria-busy={busy}
+        >
+          {busy ? <span className="g-spinner g-spinner--sm library-upload-spinner" aria-hidden="true" /> : <Icon name="upload" size={16} />}
+          {uploadLabel}
+        </button>
         <input
           ref={fileInputRef}
           type="file"
           accept={ACCEPT_STRING}
           multiple
-          style={{ display: 'none' }}
+          hidden
           onChange={(e) => {
             const files = Array.from(e.target.files ?? []);
             e.target.value = '';
@@ -928,13 +763,62 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
         />
       </div>
 
+      {documents.length > 0 && (
+        <div className="library-toolbar" role="search">
+          <div className="g-input-wrap g-input-wrap--leading library-search">
+            <Icon name="search" size={16} className="g-input-icon" />
+            <label htmlFor="library-search" className="visually-hidden">Search documents</label>
+            <input
+              id="library-search"
+              ref={searchInputRef}
+              className="g-input"
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && query) {
+                  e.stopPropagation();
+                  setQuery('');
+                }
+              }}
+              placeholder="Search documents"
+              autoComplete="off"
+              enterKeyHint="search"
+            />
+            {query ? (
+              <button type="button" className="g-icon-btn g-input-action" onClick={() => { setQuery(''); searchInputRef.current?.focus(); }} aria-label="Clear search">
+                <Icon name="x" size={16} />
+              </button>
+            ) : (
+              !isPhone && <kbd className="g-kbd library-search-kbd" aria-hidden="true">/</kbd>
+            )}
+          </div>
+
+          <div className="library-toolbar-group">
+            <label className="visually-hidden" htmlFor="library-sort">Sort by</label>
+            <select id="library-sort" className="g-select library-sort" value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
+              {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
+                <option key={key} value={key}>{SORT_LABELS[key]}</option>
+              ))}
+            </select>
+
+            <div className="g-segmented" role="group" aria-label="Layout">
+              <button onClick={() => setViewMode('list')} aria-label="List view" title="List view" aria-pressed={viewMode === 'list'}>
+                <Icon name="list" size={17} />
+              </button>
+              <button onClick={() => setViewMode('grid')} aria-label="Grid view" title="Grid view" aria-pressed={viewMode === 'grid'}>
+                <Icon name="grid" size={17} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="visually-hidden" role="status" aria-live="polite">{announcement}</div>
+
       {dragOver && (
-        <div className="library-drop-overlay">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
+        <div className="library-drop-overlay" aria-hidden="true">
+          <Icon name="upload" size={28} />
           <span>Drop to upload</span>
           <span className="library-drop-overlay-hint">PDF, PNG, JPG or WebP</span>
         </div>
@@ -952,10 +836,11 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
           busy={uploading}
           width={460}
         >
-          <form className="g-form" onSubmit={handlePdfImportSubmit}>
-            <label className="g-field">
-              Pages
+          <form className="g-form g-modal-body" onSubmit={handlePdfImportSubmit}>
+            <div className="g-field">
+              <label className="g-label" htmlFor="pdf-page-range">Pages</label>
               <input
+                id="pdf-page-range"
                 ref={pageRangeInputRef}
                 className="g-input"
                 value={pendingPdfImport.rangeText}
@@ -965,32 +850,27 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
                   error: null,
                 } : current)}
                 placeholder="1-3, 5, 8"
+                inputMode="numeric"
                 disabled={uploading}
                 aria-describedby="pdf-page-range-hint"
-                aria-invalid={Boolean(pendingPdfImport.error || pendingPdfSelection?.error)}
+                aria-invalid={Boolean(pendingPdfImport.error || pendingPdfSelection?.error) || undefined}
               />
-            </label>
-            <div
-              id="pdf-page-range-hint"
-              className={`library-modal-hint${pendingPdfImport.error || pendingPdfSelection?.error ? ' is-error' : ''}`}
-            >
-              {pendingPdfImport.error || pendingPdfSelection?.error || (
-                `${pendingPdfSelection?.pages.length || 0} of ${pendingPdfImport.pageCount} pages selected · use ranges like 1-3, 5, 8`
-              )}
+              <span
+                id="pdf-page-range-hint"
+                className={`g-hint${pendingPdfImport.error || pendingPdfSelection?.error ? ' is-error' : ''}`}
+                aria-live="polite"
+              >
+                {pendingPdfImport.error || pendingPdfSelection?.error || (
+                  `${pendingPdfSelection?.pages.length || 0} of ${pendingPdfImport.pageCount} pages selected. Use ranges like 1-3, 5, 8.`
+                )}
+              </span>
             </div>
             <div className="g-modal-actions">
-              <button
-                type="button"
-                className="g-btn g-btn--secondary"
-                onClick={() => setPendingPdfImport(null)}
-                disabled={uploading}
-              >
+              <button type="button" className="g-btn g-btn--secondary" onClick={() => setPendingPdfImport(null)} disabled={uploading}>
                 Cancel
               </button>
               <button type="submit" className="g-btn g-btn--primary" disabled={uploading || Boolean(pendingPdfSelection?.error)}>
-                {uploading
-                  ? 'Importing…'
-                  : `Import ${pluralize(pendingPdfSelection?.pages.length || 0, 'page')}`}
+                {uploading ? 'Importing…' : `Import ${pluralize(pendingPdfSelection?.pages.length || 0, 'page')}`}
               </button>
             </div>
           </form>
@@ -999,23 +879,21 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ onDocumentSele
 
       {renameDoc && (
         <Modal title="Rename document" onClose={closeRenameDialog} busy={renaming}>
-          <form className="g-form" onSubmit={handleRenameSubmit}>
-            <input
-              ref={renameInputRef}
-              className="g-input"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              placeholder="Document name"
-              aria-label="Document name"
-              disabled={renaming}
-            />
-            <div className="g-modal-actions">
-              <button
-                type="button"
-                className="g-btn g-btn--secondary"
-                onClick={closeRenameDialog}
+          <form className="g-form g-modal-body" onSubmit={handleRenameSubmit}>
+            <div className="g-field">
+              <label className="g-label" htmlFor="rename-input">Name</label>
+              <input
+                id="rename-input"
+                ref={renameInputRef}
+                className="g-input"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
                 disabled={renaming}
-              >
+                autoComplete="off"
+              />
+            </div>
+            <div className="g-modal-actions">
+              <button type="button" className="g-btn g-btn--secondary" onClick={closeRenameDialog} disabled={renaming}>
                 Cancel
               </button>
               <button type="submit" className="g-btn g-btn--primary" disabled={renaming || !renameValue.trim()}>

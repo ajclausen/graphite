@@ -27,14 +27,24 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   render() {
     if (this.state.hasError) {
       return this.props.fallback || (
-        <div style={{ padding: '1rem', border: '2px solid red', backgroundColor: '#ffe6e6' }}>
-          <h3>Something went wrong!</h3>
-          <p>Error: {this.state.error?.message}</p>
-          <details>
-            <summary>Error details</summary>
-            <pre>{this.state.error?.stack}</pre>
-          </details>
-        </div>
+        <main className="app-loading" role="alert">
+          <div className="g-empty">
+            <h1 className="g-empty-title">Something went wrong</h1>
+            <p className="g-empty-text">
+              Graphite hit an unexpected error. Your saved work is safe; reloading usually fixes this.
+            </p>
+            <div className="g-empty-actions">
+              <button className="g-btn g-btn--primary" onClick={() => window.location.reload()}>Reload</button>
+              <a className="g-btn g-btn--secondary" href="#/" onClick={() => window.location.reload()}>Go to documents</a>
+            </div>
+            {this.state.error?.message && (
+              <details className="error-details">
+                <summary>Technical details</summary>
+                <pre>{this.state.error.message}</pre>
+              </details>
+            )}
+          </div>
+        </main>
       );
     }
 

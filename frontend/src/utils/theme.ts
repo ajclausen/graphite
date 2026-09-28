@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 const STORAGE_KEY = 'graphite-theme';
 export type Theme = 'light' | 'dark';
 
@@ -13,7 +15,7 @@ export function applyTheme(theme: Theme): void {
   localStorage.setItem(STORAGE_KEY, theme);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
-    meta.setAttribute('content', theme === 'dark' ? '#1B1D21' : '#F5F0E8');
+    meta.setAttribute('content', theme === 'dark' ? '#17171a' : '#fbfaf8');
   }
 }
 
@@ -29,4 +31,15 @@ export function toggleTheme(): Theme {
 
 export function initTheme(): void {
   applyTheme(getStoredTheme());
+}
+
+/** Current app theme, kept in sync with toggles made anywhere in the app. */
+export function useAppTheme(): Theme {
+  const [theme, setTheme] = useState<Theme>(getCurrentTheme);
+  useEffect(() => {
+    const observer = new MutationObserver(() => setTheme(getCurrentTheme()));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+  return theme;
 }

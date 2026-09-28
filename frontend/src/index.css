@@ -1,115 +1,243 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Graphite design tokens
+
+   Every text/background pairing below was checked against WCAG 2.2 AA:
+   text ≥ 4.5:1, input borders and focus rings ≥ 3:1 against the surfaces
+   they sit on. Keep new colors inside this set rather than adding one-offs.
+   ───────────────────────────────────────────────────────────────────────── */
+
 :root {
-  /* Dark Graphite palette (default) */
-  --g-bg: #1B1D21;
-  --g-bg-elevated: #1F2125;
-  --g-surface: #24272C;
-  --g-surface-hover: #2E3238;
-  --g-surface-active: #353A40;
-  --g-charcoal: #16181B;
-  --g-charcoal-light: #2E3238;
-  --g-text: #E8E9EB;
-  --g-text-secondary: #8B8F96;
-  --g-text-tertiary: #5C6068;
-  --g-border: rgba(255, 255, 255, 0.07);
-  --g-border-light: rgba(255, 255, 255, 0.04);
-  --g-amber: #D4922A;
-  --g-amber-hover: #BF8224;
-  --g-amber-glow: rgba(212, 146, 42, 0.12);
-  --g-danger: #E8766A;
-  --g-danger-bg: rgba(232, 118, 106, 0.1);
-  --g-success: #7BAF8B;
+  color-scheme: dark;
 
-  --g-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
-  --g-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.25);
-  --g-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.35);
-  --g-shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.3);
+  /* Surfaces, darkest to lightest */
+  --bg: #111113;
+  --bg-subtle: #17171a;       /* app bars, sidebars */
+  --surface: #1c1c20;         /* cards, panels, menus */
+  --surface-2: #26262b;       /* hover, inputs, secondary buttons */
+  --surface-3: #303036;       /* pressed / selected */
+  --canvas-bg: #0c0c0e;       /* behind PDF pages */
 
-  /* Toolbar chrome (dark) */
-  --g-toolbar-btn: rgba(255, 255, 255, 0.06);
-  --g-toolbar-btn-hover: rgba(255, 255, 255, 0.1);
-  --g-toolbar-btn-active: rgba(255, 255, 255, 0.12);
-  --g-toolbar-text: rgba(255, 255, 255, 0.55);
-  --g-toolbar-text-hover: #ffffff;
-  --g-toolbar-divider: rgba(255, 255, 255, 0.12);
-  --g-toolbar-gradient: rgba(255, 255, 255, 0.015);
-  --g-card-menu-bg: rgba(36, 39, 44, 0.85);
-  --g-overlay-bg: rgba(0, 0, 0, 0.55);
+  --border: #2a2a30;          /* decorative dividers */
+  --border-strong: #3a3a41;
+  --border-input: #6a6a74;    /* ≥3:1 so fields are identifiable */
 
-  --g-radius: 10px;
-  --g-radius-lg: 14px;
+  --text: #ededef;
+  --text-2: #b4b4bc;
+  --text-3: #8f8f99;          /* lowest-emphasis text still ≥4.5:1 */
 
-  --g-font-display: 'Instrument Serif', Georgia, serif;
-  --g-font-body: 'Outfit', system-ui, -apple-system, sans-serif;
+  --accent: #e8a33d;          /* amber: primary actions only */
+  --accent-hover: #f0b050;
+  --accent-fg: #1a1206;       /* text on accent, 8.6:1 */
+  --accent-text: #f2b65a;     /* amber used as text */
+  --accent-soft: rgba(232, 163, 61, 0.14);
+  --focus: #e8a33d;
 
-  font-family: var(--g-font-body);
+  --danger: #f47067;
+  --danger-solid: #d93025;
+  --danger-soft: rgba(244, 112, 103, 0.12);
+  --success: #5cc98a;
+  --success-soft: rgba(92, 201, 138, 0.12);
+
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  /* Type */
+  --font-sans: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-brand: 'Instrument Serif', Georgia, serif;
+  --text-xs: 0.75rem;   /* 12 */
+  --text-sm: 0.8125rem; /* 13 */
+  --text-md: 0.875rem;  /* 14 */
+  --text-lg: 1rem;      /* 16 */
+  --text-xl: 1.25rem;   /* 20 */
+  --text-2xl: 1.5rem;   /* 24 */
+
+  /* Shape & rhythm */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Controls: comfortable on desktop, ≥44px touch targets on touch screens */
+  --control-h: 36px;
+  --control-h-sm: 32px;
+  --header-h: 56px;
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --z-header: 50;
+  --z-drawer: 150;
+  --z-menu: 200;
+  --z-modal: 1000;
+  --z-toast: 1100;
+
+  /* Legacy aliases still read by a few layout rules */
+  --g-font-body: var(--font-sans);
+
+  font-family: var(--font-sans);
+  font-size: 16px;
   line-height: 1.5;
   font-weight: 400;
-  color: var(--g-text);
-
+  color: var(--text);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  font-feature-settings: 'cv11', 'ss01';
 }
 
-/* ── Light theme ── */
+[data-theme='light'] {
+  color-scheme: light;
 
-[data-theme="light"] {
-  --g-bg: #F5F0E8;
-  --g-bg-elevated: #FAF7F2;
-  --g-surface: #FFFFFF;
-  --g-surface-hover: #F0EBE3;
-  --g-surface-active: #E8E2D8;
-  --g-charcoal: #FDFBF8;
-  --g-charcoal-light: #EDE8E0;
-  --g-text: #2C2A26;
-  --g-text-secondary: #6B6560;
-  --g-text-tertiary: #9C948B;
-  --g-border: rgba(0, 0, 0, 0.09);
-  --g-border-light: rgba(0, 0, 0, 0.04);
-  --g-amber: #B87D1A;
-  --g-amber-hover: #A26E15;
-  --g-amber-glow: rgba(184, 125, 26, 0.12);
-  --g-danger: #D05A4E;
-  --g-danger-bg: rgba(208, 90, 78, 0.08);
-  --g-success: #4A8F5A;
+  --bg: #f7f6f3;
+  --bg-subtle: #fbfaf8;
+  --surface: #ffffff;
+  --surface-2: #f0eeea;
+  --surface-3: #e6e3dd;
+  --canvas-bg: #e9e7e2;
 
-  --g-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --g-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.07);
-  --g-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.1);
-  --g-shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.08);
+  --border: #e6e3de;
+  --border-strong: #d6d2cb;
+  --border-input: #8f8a82;
 
-  --g-toolbar-btn: rgba(0, 0, 0, 0.05);
-  --g-toolbar-btn-hover: rgba(0, 0, 0, 0.08);
-  --g-toolbar-btn-active: rgba(0, 0, 0, 0.12);
-  --g-toolbar-text: rgba(0, 0, 0, 0.5);
-  --g-toolbar-text-hover: #2C2A26;
-  --g-toolbar-divider: rgba(0, 0, 0, 0.1);
-  --g-toolbar-gradient: rgba(0, 0, 0, 0.012);
-  --g-card-menu-bg: rgba(255, 255, 255, 0.9);
-  --g-overlay-bg: rgba(0, 0, 0, 0.35);
+  --text: #1c1b19;
+  --text-2: #4f4b45;
+  --text-3: #6b665f;
+
+  --accent: #e8a33d;
+  --accent-hover: #dc962c;
+  --accent-fg: #1a1206;
+  --accent-text: #8a5608;
+  --accent-soft: rgba(232, 163, 61, 0.16);
+  --focus: #8a5608;           /* amber is only 2:1 on light surfaces */
+
+  --danger: #c0362c;
+  --danger-solid: #c9352b;
+  --danger-soft: rgba(192, 54, 44, 0.08);
+  --success: #1d7040;
+  --success-soft: rgba(29, 112, 64, 0.1);
+
+  --overlay: rgba(20, 18, 15, 0.4);
+  --shadow-sm: 0 1px 2px rgba(28, 27, 25, 0.06);
+  --shadow-md: 0 4px 12px rgba(28, 27, 25, 0.08), 0 1px 3px rgba(28, 27, 25, 0.06);
+  --shadow-lg: 0 16px 40px rgba(28, 27, 25, 0.14), 0 2px 8px rgba(28, 27, 25, 0.06);
 }
 
-* {
+/* Touch screens: every control is at least 44×44px */
+@media (pointer: coarse) {
+  :root {
+    --control-h: 44px;
+    --control-h-sm: 44px;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --header-h: 52px;
+  }
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
   padding: 0;
+}
+
+body {
   min-width: 320px;
   min-height: 100vh;
-  background: var(--g-bg);
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--text-md);
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
 }
 
 button {
-  font-family: inherit;
+  cursor: pointer;
 }
 
-/* Scrollbar */
+button:disabled {
+  cursor: not-allowed;
+}
+
+img,
+svg,
+canvas {
+  display: block;
+}
+
+svg {
+  flex-shrink: 0;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent-text);
+}
+
+/* iOS zooms the page when focusing inputs under 16px. Class selectors so
+   component styles can't win on specificity. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea,
+  .g-input,
+  .g-select,
+  .page-nav-input {
+    font-size: 16px !important;
+  }
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+/* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-3) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -117,23 +245,58 @@ button {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(128, 128, 128, 0.2);
-  border-radius: 4px;
+  background: var(--surface-3);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(128, 128, 128, 0.35);
+/* ── Focus: visible for keyboard users, never for mouse clicks ────────────── */
+
+:where(button, a, input, select, textarea, summary, [tabindex]):focus {
+  outline: none;
 }
 
-/* Keyboard focus: visible for keyboard users, invisible for mouse clicks */
-:where(button, a, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--g-amber);
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
 /* Excalidraw draws its own focus treatment */
 .excalidraw :focus-visible {
   outline: revert;
+}
+
+/* ── Accessibility utilities ──────────────────────────────────────────────── */
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: calc(var(--z-toast) + 1);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus-visible {
+  transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -147,15 +310,17 @@ button {
   }
 }
 
-/* Screen-reader-only text */
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
+/* Windows High Contrast / forced colors: keep boundaries and focus visible */
+@media (forced-colors: active) {
+  .g-btn,
+  .g-icon-btn,
+  .g-input,
+  .g-menu,
+  .g-modal {
+    border: 1px solid CanvasText;
+  }
+
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid Highlight;
+  }
 }

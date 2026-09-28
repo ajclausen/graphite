@@ -13,6 +13,10 @@ import type { Document } from '../api/client';
 import { useAnnotationStore } from '../store/annotationStore';
 import { confirmDialog, toast, errorMessage } from '../store/uiStore';
 import { pluralize } from '../utils/format';
+import { useMediaQuery } from '../utils/useMediaQuery';
+import { Modal } from './ui/Modal';
+import { Menu, type MenuItemDef } from './ui/Menu';
+import { Icon } from './ui/Icon';
 import { pdfjs } from '../utils/pdfWorker';
 import { PDF_DOCUMENT_OPTIONS } from '../utils/pdfOptions';
 import './PDFPageManager.css';
@@ -118,48 +122,20 @@ function formatSelectedPages(pageNumbers: number[]): string {
   return `${pageNumbers.length} pages selected`;
 }
 
-interface ManagerButtonProps {
-  children: React.ReactNode;
-  label: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  danger?: boolean;
-  primary?: boolean;
-  title?: string;
-}
-
-const ManagerButton: React.FC<ManagerButtonProps> = ({
-  children,
-  label,
-  onClick,
-  disabled = false,
-  danger = false,
-  primary = false,
-  title,
-}) => (
-  <button
-    type="button"
-    className={`pdf-page-manager-button${danger ? ' is-danger' : ''}${primary ? ' is-primary' : ''}`}
-    onClick={onClick}
-    disabled={disabled}
-    title={title || label}
-  >
-    {children}
-    <span>{label}</span>
-  </button>
-);
-
 interface PDFPageThumbnailProps {
   pdfDocument: PDFDocumentProxy | null;
   pageNumber: number;
   displayNumber: number;
   selected: boolean;
   active: boolean;
+  focusable: boolean;
   dragging: boolean;
   dropPosition: DropPosition | null;
   disabled: boolean;
-  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  onDragStart: (event: React.DragEvent<HTMLButtonElement>) => void;
+  onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onToggle: () => void;
+  onFocus: () => void;
+  onDragStart: (event: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
 }
 
@@ -169,10 +145,13 @@ const PDFPageThumbnail: React.FC<PDFPageThumbnailProps> = ({
   displayNumber,
   selected,
   active,
+  focusable,
   dragging,
   dropPosition,
   disabled,
   onClick,
+  onToggle,
+  onFocus,
   onDragStart,
   onDragEnd,
 }) => {
@@ -206,8 +185,8 @@ const PDFPageThumbnail: React.FC<PDFPageThumbnailProps> = ({
         }
 
         const baseViewport = page.getViewport({ scale: 1 });
-        const maxWidth = 190;
-        const maxHeight = 138;
+        const maxWidth = 168;
+        const maxHeight = 200;
         const cssScale = Math.min(maxWidth / baseViewport.width, maxHeight / baseViewport.height);
         const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
         const viewport = page.getViewport({ scale: cssScale * pixelRatio });
@@ -244,30 +223,48 @@ const PDFPageThumbnail: React.FC<PDFPageThumbnailProps> = ({
     };
   }, [pdfDocument, pageNumber]);
 
+  const moved = pageNumber !== displayNumber;
+  const label = `Page ${displayNumber}${moved ? `, moved from ${pageNumber}` : ''}${active ? ', open in editor' : ''}`;
+
   return (
-    <button
-      type="button"
-      className={`pdf-page-thumbnail${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}${dragging ? ' is-dragging' : ''}${dropPosition === 'before' ? ' is-drop-before' : ''}${dropPosition === 'after' ? ' is-drop-after' : ''}`}
+    <div
+      role="option"
+      aria-selected={selected}
+      aria-label={label}
+      tabIndex={focusable ? 0 : -1}
+      className={`pm-page${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}${dragging ? ' is-dragging' : ''}${dropPosition === 'before' ? ' is-drop-before' : ''}${dropPosition === 'after' ? ' is-drop-after' : ''}`}
       onClick={onClick}
+      onFocus={onFocus}
       draggable={!disabled}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       data-page={pageNumber}
-      title={`Page ${displayNumber}`}
     >
-      <div className="pdf-page-thumbnail-canvas-wrap">
-        <canvas ref={canvasRef} />
+      <div className="pm-page-canvas">
+        <canvas ref={canvasRef} aria-hidden="true" />
         {renderState !== 'ready' && (
-          <span className="pdf-page-thumbnail-state">
-            {renderState === 'error' ? 'Preview failed' : 'Rendering...'}
+          <span className="pm-page-state" aria-hidden="true">
+            {renderState === 'error' ? 'No preview' : <span className="g-spinner g-spinner--sm" />}
           </span>
         )}
       </div>
-      <div className="pdf-page-thumbnail-footer">
-        <span>{displayNumber}</span>
-        {pageNumber !== displayNumber && <span className="pdf-page-thumbnail-source">was {pageNumber}</span>}
+      <div className="pm-page-footer" aria-hidden="true">
+        <span className="pm-page-number">{displayNumber}</span>
+        {moved && <span className="pm-page-moved">was {pageNumber}</span>}
+        {active && !moved && <span className="pm-page-open">Open</span>}
       </div>
-    </button>
+      {/* Tap target for multi-select on touch; keyboard users press Space instead */}
+      <span
+        className="pm-page-check"
+        aria-hidden="true"
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle();
+        }}
+      >
+        <Icon name="check" size={14} strokeWidth={3} />
+      </span>
+    </div>
   );
 };
 
@@ -311,7 +308,6 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
     [pageOrder, selectedPages],
   );
 
-  const selectedSummary = useMemo(() => formatSelectedPages(selectedOrdered), [selectedOrdered]);
   const sourcePdfSelection = useMemo(
     () => sourcePdfImport ? parsePageRange(sourcePdfImport.rangeText, sourcePdfImport.pageCount) : null,
     [sourcePdfImport],
@@ -354,7 +350,7 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleClose, sourcePdfImport, working]);
 
-  const handleThumbnailClick = useCallback((pageNumber: number, event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleThumbnailClick = useCallback((pageNumber: number, event: React.MouseEvent<HTMLDivElement>) => {
     setSelectedPages((current) => {
       if (event.shiftKey) {
         const startIndex = pageOrder.indexOf(lastSelectedPage);
@@ -444,7 +440,7 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
     [pageOrder],
   );
 
-  const handleDragStart = useCallback((pageNumber: number, event: React.DragEvent<HTMLButtonElement>) => {
+  const handleDragStart = useCallback((pageNumber: number, event: React.DragEvent<HTMLDivElement>) => {
     setDraggedPage(pageNumber);
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', String(pageNumber));
@@ -690,123 +686,263 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
     }
   }, [doc.id, onDocumentUpdated, sourcePdfImport, working]);
 
+  // ── Keyboard / touch selection and reordering ──────────────────────────────
+
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const [focusedPage, setFocusedPage] = useState<number>(() => Math.min(Math.max(1, currentPage), numPages));
+  const [announcement, setAnnouncement] = useState('');
+  const isTouch = useMediaQuery('(pointer: coarse)');
+
+  const announce = useCallback((message: string) => {
+    // Clear first so repeating the same message is still announced.
+    setAnnouncement('');
+    requestAnimationFrame(() => setAnnouncement(message));
+  }, []);
+
+  const focusPage = useCallback((page: number) => {
+    // Every page element is already rendered and focusable, so move focus
+    // right away rather than a frame later.
+    gridRef.current?.querySelector<HTMLElement>(`[data-page="${page}"]`)?.focus();
+    setFocusedPage(page);
+  }, []);
+
+  // Open with keyboard focus on the page that's open in the editor.
+  useEffect(() => {
+    const page = Math.min(Math.max(1, currentPage), numPages);
+    const frame = requestAnimationFrame(() => {
+      const el = gridRef.current?.querySelector<HTMLElement>(`[data-page="${page}"]`);
+      el?.focus();
+      el?.scrollIntoView({ block: 'center' });
+    });
+    return () => cancelAnimationFrame(frame);
+    // Only on open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep Tab inside the manager while it's open (it's a modal view).
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      if (document.querySelector('.g-modal, .g-menu')) return;
+      const items = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), [tabindex="0"], input:not(:disabled), select:not(:disabled)',
+      )).filter((el) => el.offsetParent !== null);
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const toggleSelected = useCallback((page: number) => {
+    const next = new Set(selectedPages);
+    if (next.has(page)) {
+      if (next.size > 1) next.delete(page);
+    } else {
+      next.add(page);
+    }
+    setSelectedPages(next);
+    setLastSelectedPage(page);
+    announce(formatSelectedPages(pageOrder.filter((p) => next.has(p))));
+  }, [announce, pageOrder, selectedPages]);
+
+  const allSelected = selectedPages.size === pageOrder.length;
+
+  const toggleSelectAll = useCallback(() => {
+    if (allSelected) {
+      setSingleSelection(focusedPage);
+      announce(`Page ${pageOrder.indexOf(focusedPage) + 1} selected`);
+    } else {
+      setSelectedPages(new Set(pageOrder));
+      announce(`All ${pageOrder.length} pages selected`);
+    }
+  }, [allSelected, announce, focusedPage, pageOrder, setSingleSelection]);
+
+  const canMove = (delta: -1 | 1) => {
+    if (working || selectedOrdered.length === 0 || selectedOrdered.length === pageOrder.length) return false;
+    return pageOrder.some((page, index) => {
+      const neighbor = pageOrder[index + delta];
+      return selectedPages.has(page) && neighbor !== undefined && !selectedPages.has(neighbor);
+    });
+  };
+
+  /** Moves the selected pages one step as a block, keeping their relative order. */
+  const moveSelection = useCallback((delta: -1 | 1) => {
+    const next = [...pageOrder];
+    let movedAny = false;
+    if (delta < 0) {
+      for (let i = 1; i < next.length; i += 1) {
+        if (selectedPages.has(next[i]) && !selectedPages.has(next[i - 1])) {
+          [next[i - 1], next[i]] = [next[i], next[i - 1]];
+          movedAny = true;
+        }
+      }
+    } else {
+      for (let i = next.length - 2; i >= 0; i -= 1) {
+        if (selectedPages.has(next[i]) && !selectedPages.has(next[i + 1])) {
+          [next[i + 1], next[i]] = [next[i], next[i + 1]];
+          movedAny = true;
+        }
+      }
+    }
+    if (!movedAny) return;
+    setPageOrder(next);
+    const positions = next
+      .map((page, index) => (selectedPages.has(page) ? index + 1 : null))
+      .filter((p): p is number => p !== null);
+    announce(positions.length === 1
+      ? `Moved to position ${positions[0]} of ${next.length}. Save order to keep it.`
+      : `Moved ${positions.length} pages ${delta < 0 ? 'earlier' : 'later'}. Save order to keep it.`);
+    requestAnimationFrame(() => {
+      gridRef.current?.querySelector<HTMLElement>(`[data-page="${focusedPage}"]`)?.scrollIntoView({ block: 'nearest' });
+    });
+  }, [announce, focusedPage, pageOrder, selectedPages]);
+
+  const getColumnCount = () => {
+    const items = gridRef.current?.querySelectorAll<HTMLElement>('[data-page]');
+    if (!items || items.length === 0) return 1;
+    const firstTop = items[0].getBoundingClientRect().top;
+    let count = 0;
+    for (const item of Array.from(items)) {
+      if (Math.abs(item.getBoundingClientRect().top - firstTop) > 2) break;
+      count += 1;
+    }
+    return Math.max(1, count);
+  };
+
+  const handleGridKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const index = pageOrder.indexOf(focusedPage);
+    if (index < 0) return;
+    const columns = getColumnCount();
+    const steps: Record<string, number> = {
+      ArrowLeft: -1,
+      ArrowRight: 1,
+      ArrowUp: -columns,
+      ArrowDown: columns,
+    };
+
+    // Alt+Arrow moves the selected pages
+    if (event.altKey && (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown')) {
+      event.preventDefault();
+      moveSelection(event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1);
+      return;
+    }
+
+    if (event.key in steps || event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      const target = event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? pageOrder.length - 1
+          : Math.min(pageOrder.length - 1, Math.max(0, index + steps[event.key]));
+      const page = pageOrder[target];
+      focusPage(page);
+      if (event.shiftKey) {
+        const anchor = pageOrder.indexOf(lastSelectedPage);
+        const [a, b] = [Math.min(anchor, target), Math.max(anchor, target)];
+        setSelectedPages(new Set(pageOrder.slice(a, b + 1)));
+      }
+      return;
+    }
+
+    if (event.key === ' ') {
+      event.preventDefault();
+      toggleSelected(focusedPage);
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      setSingleSelection(focusedPage);
+      if (!orderDirty) {
+        onGoToPage(focusedPage);
+        announce(`Page ${index + 1} opened in the editor`);
+      }
+    } else if ((event.key === 'a' || event.key === 'A') && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      setSelectedPages(new Set(pageOrder));
+      announce(`All ${pageOrder.length} pages selected`);
+    } else if ((event.key === 'Delete' || event.key === 'Backspace') && !actionDisabled) {
+      event.preventDefault();
+      void handleDeletePages();
+    }
+  };
+
+  const actionsLocked = Boolean(working) || orderDirty;
+  const moreItems: MenuItemDef[] = [
+    { id: 'copy', label: 'Duplicate', icon: 'copy', onSelect: () => void handleDuplicatePages(), disabled: actionDisabled },
+    { id: 'blank', label: 'Insert blank page after', icon: 'filePlus', onSelect: () => void handleInsertBlankPage(), disabled: actionDisabled },
+    { id: 'append', label: 'Insert pages from a PDF…', icon: 'fileImport', onSelect: () => sourcePdfInputRef.current?.click(), disabled: actionDisabled },
+    { id: 'extract', label: 'Extract to new PDF', icon: 'fileExport', onSelect: () => void handleExtractPages(), disabled: actionDisabled },
+  ];
+
   return (
-    <div className="pdf-page-manager" role="dialog" aria-modal="true" aria-label="Manage PDF pages">
-      <div className="pdf-page-manager-toolbar">
-        <div className="pdf-page-manager-toolbar-group">
-          <ManagerButton label="Done" onClick={handleClose} title="Return to annotator">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </ManagerButton>
-          <div className="pdf-page-manager-divider" />
-          <div className="pdf-page-manager-title" title={doc.original_name}>
-            <strong>{doc.original_name}</strong>
-            <span>{working || (orderDirty ? 'Unsaved order' : `${numPages} pages`)}</span>
-          </div>
+    <div
+      ref={dialogRef}
+      className="pm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pm-title"
+      aria-describedby="pm-subtitle"
+    >
+      <div className="pm-bar">
+        <button type="button" className="g-btn g-btn--ghost pm-done" onClick={() => void handleClose()} aria-label="Done">
+          <Icon name="arrowLeft" size={18} />
+          <span>Done</span>
+        </button>
+        <div className="pm-title-wrap">
+          <h2 id="pm-title" className="pm-title">Pages</h2>
+          <p id="pm-subtitle" className="pm-subtitle">
+            <span className="pm-doc-name">{doc.original_name}</span>
+            <span aria-hidden="true">·</span>
+            <span>{working ? `${working}…` : orderDirty ? 'Unsaved order' : pluralize(numPages, 'page')}</span>
+          </p>
         </div>
-
-        <div className="pdf-page-manager-toolbar-group is-scrollable">
-          <ManagerButton
-            label="Save order"
-            onClick={handleSaveOrder}
-            disabled={!orderDirty || Boolean(working)}
-            primary
-            title="Save reordered pages"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-              <polyline points="17 21 17 13 7 13 7 21" />
-              <polyline points="7 3 7 8 15 8" />
-            </svg>
-          </ManagerButton>
-          <ManagerButton
-            label="Reset order"
-            onClick={handleResetOrder}
-            disabled={!orderDirty || Boolean(working)}
-            title="Reset reordered pages"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="1 4 1 10 7 10" />
-              <path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10" />
-            </svg>
-          </ManagerButton>
-          <div className="pdf-page-manager-divider" />
-          <ManagerButton
-            label="Insert page"
-            onClick={handleInsertBlankPage}
-            disabled={actionDisabled}
-            title="Insert a blank page after the selection"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="8" y1="13" x2="16" y2="13" />
-              <line x1="12" y1="9" x2="12" y2="17" />
-            </svg>
-          </ManagerButton>
-          <ManagerButton
-            label="Append file"
-            onClick={() => sourcePdfInputRef.current?.click()}
-            disabled={actionDisabled}
-            title="Insert pages from another PDF after the selection"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <path d="M8 13h8" />
-              <path d="M12 9v8" />
-              <path d="M18 13h3" />
-            </svg>
-          </ManagerButton>
-          <input
-            ref={sourcePdfInputRef}
-            type="file"
-            accept="application/pdf,.pdf"
-            onChange={handleSourcePdfSelect}
-            style={{ display: 'none' }}
-          />
-          <ManagerButton label="Rotate" onClick={handleRotatePages} disabled={actionDisabled} title="Rotate selected pages clockwise">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="23 4 23 10 17 10" />
-              <path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10" />
-            </svg>
-          </ManagerButton>
-          <ManagerButton label="Copy" onClick={handleDuplicatePages} disabled={actionDisabled} title="Duplicate selected pages">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
-          </ManagerButton>
-          <ManagerButton label="Extract" onClick={handleExtractPages} disabled={actionDisabled} title="Create a new PDF from selected pages">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <path d="M9 15h8" />
-              <polyline points="14 12 17 15 14 18" />
-            </svg>
-          </ManagerButton>
-          <ManagerButton label="Delete" onClick={handleDeletePages} disabled={actionDisabled || selectedOrdered.length >= numPages} danger title="Delete selected pages">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-              <path d="M10 11v6" />
-              <path d="M14 11v6" />
-              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-            </svg>
-          </ManagerButton>
+        <div className="pm-bar-actions">
+          {orderDirty ? (
+            <>
+              <button type="button" className="g-btn g-btn--ghost g-btn--sm" onClick={handleResetOrder} disabled={Boolean(working)} aria-label="Reset order">
+                <Icon name="undo" size={16} />
+                <span className="pm-hide-phone">Reset</span>
+              </button>
+              <button type="button" className="g-btn g-btn--primary g-btn--sm" onClick={() => void handleSaveOrder()} disabled={Boolean(working)}>
+                <Icon name="check" size={16} strokeWidth={2.5} />
+                Save order
+              </button>
+            </>
+          ) : (
+            <button type="button" className="g-btn g-btn--ghost g-btn--sm" onClick={toggleSelectAll} disabled={Boolean(working)} aria-pressed={allSelected}>
+              <Icon name="selectAll" size={16} />
+              {allSelected ? 'Select one' : 'Select all'}
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="pdf-page-manager-subbar">
-        <span>{selectedSummary}</span>
-        {orderDirty && <span>Save order before using page actions.</span>}
-      </div>
+      <p className="pm-hint" id="pm-hint">
+        {isTouch
+          ? 'Tap a page to open it. Tap the circle to select several, then move or edit them below.'
+          : 'Click to select, Shift or Ctrl-click for more. Drag or use the arrows below to reorder.'}
+        <span className="visually-hidden">
+          {' '}Keyboard: arrow keys move between pages, Space selects, Shift with arrows extends the selection,
+          Alt with arrows moves selected pages, Enter opens a page, Delete removes selected pages.
+        </span>
+      </p>
 
       <div
-        className="pdf-page-manager-grid"
-        aria-label="PDF pages"
+        id="pm-grid"
+        className="pm-grid"
+        role="listbox"
+        aria-multiselectable="true"
+        aria-label="Pages"
+        aria-describedby="pm-hint"
         ref={gridRef}
+        onKeyDown={handleGridKeyDown}
         onDragOver={handleGridDragOver}
         onDragLeave={handleGridDragLeave}
         onDrop={handleGridDrop}
@@ -819,6 +955,7 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
             displayNumber={index + 1}
             selected={selectedPages.has(pageNumber)}
             active={!orderDirty && pageNumber === currentPage}
+            focusable={pageNumber === focusedPage}
             dragging={draggedPage === pageNumber}
             dropPosition={
               dropTarget && dropTarget.page === pageNumber && draggedPage !== pageNumber
@@ -826,30 +963,116 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
                 : null
             }
             disabled={Boolean(working)}
-            onClick={(event) => handleThumbnailClick(pageNumber, event)}
+            onClick={(event) => {
+              setFocusedPage(pageNumber);
+              handleThumbnailClick(pageNumber, event);
+            }}
+            onToggle={() => {
+              setFocusedPage(pageNumber);
+              toggleSelected(pageNumber);
+            }}
+            onFocus={() => setFocusedPage(pageNumber)}
             onDragStart={(event) => handleDragStart(pageNumber, event)}
             onDragEnd={handleDragEnd}
           />
         ))}
       </div>
 
+      <div className="pm-actions" role="group" aria-label="Page actions">
+        <div className="pm-selection" aria-hidden="true">
+          <strong>{selectedOrdered.length}</strong>
+          <span>{selectedOrdered.length === 1 ? 'page selected' : 'pages selected'}</span>
+        </div>
+
+        <div className="pm-actions-group">
+          <button type="button" className="pm-action" onClick={() => moveSelection(-1)} disabled={!canMove(-1)} title="Move earlier (Alt+←)">
+            <Icon name="arrowLeft" size={18} />
+            <span>Earlier</span>
+          </button>
+          <button type="button" className="pm-action" onClick={() => moveSelection(1)} disabled={!canMove(1)} title="Move later (Alt+→)">
+            <Icon name="arrowRight" size={18} />
+            <span>Later</span>
+          </button>
+        </div>
+
+        <div className="pm-actions-divider" aria-hidden="true" />
+
+        <div className="pm-actions-group">
+          <button type="button" className="pm-action" onClick={() => void handleRotatePages()} disabled={actionDisabled} title="Rotate 90° clockwise">
+            <Icon name="rotate" size={18} />
+            <span>Rotate</span>
+          </button>
+          <button type="button" className="pm-action pm-desktop-only" onClick={() => void handleDuplicatePages()} disabled={actionDisabled}>
+            <Icon name="copy" size={18} />
+            <span>Duplicate</span>
+          </button>
+          <button type="button" className="pm-action pm-desktop-only" onClick={() => void handleInsertBlankPage()} disabled={actionDisabled} title="Insert a blank page after the selection">
+            <Icon name="filePlus" size={18} />
+            <span>Blank page</span>
+          </button>
+          <button type="button" className="pm-action pm-desktop-only" onClick={() => sourcePdfInputRef.current?.click()} disabled={actionDisabled} title="Insert pages from another PDF after the selection">
+            <Icon name="fileImport" size={18} />
+            <span>From PDF</span>
+          </button>
+          <button type="button" className="pm-action pm-desktop-only" onClick={() => void handleExtractPages()} disabled={actionDisabled} title="Copy the selected pages into a new PDF">
+            <Icon name="fileExport" size={18} />
+            <span>Extract</span>
+          </button>
+          <div className="pm-phone-only">
+            <Menu
+              items={moreItems}
+              header={{ title: formatSelectedPages(selectedOrdered) }}
+              renderTrigger={(props) => (
+                <button {...props} type="button" className="pm-action" disabled={actionsLocked}>
+                  <Icon name="moreHorizontal" size={18} />
+                  <span>More</span>
+                </button>
+              )}
+            />
+          </div>
+          <button
+            type="button"
+            className="pm-action pm-action--danger"
+            onClick={() => void handleDeletePages()}
+            disabled={actionDisabled || selectedOrdered.length >= numPages}
+            title={selectedOrdered.length >= numPages ? 'A PDF needs at least one page' : 'Delete selected pages'}
+          >
+            <Icon name="trash" size={18} />
+            <span>Delete</span>
+          </button>
+        </div>
+      </div>
+
+      {orderDirty && (
+        <div className="pm-toast-hint" role="status">
+          Save the new order to use the other page actions.
+        </div>
+      )}
+
+      <div className="visually-hidden" role="status" aria-live="polite">{announcement}</div>
+
+      <input
+        ref={sourcePdfInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        onChange={handleSourcePdfSelect}
+        hidden
+      />
+
       {sourcePdfImport && (
-        <div
-          className="pdf-page-manager-modal-backdrop"
-          onClick={() => {
-            if (!working) setSourcePdfImport(null);
-          }}
+        <Modal
+          title="Insert pages from a PDF"
+          description={<><strong>{sourcePdfImport.file.name}</strong> has {pluralize(sourcePdfImport.pageCount, 'page')}.</>}
+          onClose={() => { if (!working) setSourcePdfImport(null); }}
+          busy={Boolean(working)}
+          width={460}
         >
-          <div className="pdf-page-manager-modal" onClick={(event) => event.stopPropagation()}>
-            <h2>Append PDF Pages</h2>
-            <p>{sourcePdfImport.file.name}</p>
-            <form onSubmit={handleImportPdfPages}>
-              <label className="pdf-page-manager-modal-label" htmlFor="manager-source-page-range">
-                Pages
-              </label>
+          <form className="g-form g-modal-body" onSubmit={handleImportPdfPages}>
+            <div className="g-field">
+              <label className="g-label" htmlFor="manager-source-page-range">Pages to insert</label>
               <input
                 id="manager-source-page-range"
-                className="pdf-page-manager-modal-input"
+                className="g-input"
                 value={sourcePdfImport.rangeText}
                 onChange={(event) => setSourcePdfImport((current) => current ? {
                   ...current,
@@ -857,14 +1080,22 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
                   error: null,
                 } : current)}
                 placeholder="1-3, 5, 8"
+                inputMode="numeric"
                 disabled={Boolean(working)}
+                aria-describedby="manager-source-hint"
+                aria-invalid={Boolean(sourcePdfImport.error || sourcePdfSelection?.error) || undefined}
               />
-              <label className="pdf-page-manager-modal-label" htmlFor="manager-source-insert-after">
-                Insert after
-              </label>
+              <span id="manager-source-hint" className={`g-hint${sourcePdfImport.error || sourcePdfSelection?.error ? ' is-error' : ''}`} aria-live="polite">
+                {sourcePdfImport.error || sourcePdfSelection?.error || (
+                  `${sourcePdfSelection?.pages.length || 0} of ${sourcePdfImport.pageCount} pages selected`
+                )}
+              </span>
+            </div>
+            <div className="g-field">
+              <label className="g-label" htmlFor="manager-source-insert-after">Insert after</label>
               <select
                 id="manager-source-insert-after"
-                className="pdf-page-manager-modal-input"
+                className="g-select"
                 value={sourcePdfImport.insertAfterPage}
                 onChange={(event) => setSourcePdfImport((current) => current ? {
                   ...current,
@@ -879,22 +1110,17 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
                   </option>
                 ))}
               </select>
-              <div className="pdf-page-manager-modal-hint">
-                {sourcePdfImport.error || sourcePdfSelection?.error || (
-                  `${sourcePdfSelection?.pages.length || 0} of ${sourcePdfImport.pageCount} pages selected`
-                )}
-              </div>
-              <div className="pdf-page-manager-modal-actions">
-                <button type="button" onClick={() => setSourcePdfImport(null)} disabled={Boolean(working)}>
-                  Cancel
-                </button>
-                <button type="submit" className="is-primary" disabled={Boolean(working)}>
-                  {working === 'Appending PDF' ? 'Appending...' : 'Append'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            </div>
+            <div className="g-modal-actions">
+              <button type="button" className="g-btn g-btn--secondary" onClick={() => setSourcePdfImport(null)} disabled={Boolean(working)}>
+                Cancel
+              </button>
+              <button type="submit" className="g-btn g-btn--primary" disabled={Boolean(working) || Boolean(sourcePdfSelection?.error)}>
+                {working === 'Appending PDF' ? 'Inserting…' : 'Insert pages'}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );

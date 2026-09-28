@@ -1,0 +1,187 @@
+/* ── User management ──────────────────────────────────────────────────────── */
+
+.admin-header-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.admin-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.admin-role-card {
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.admin-role-card h2 {
+  font-size: var(--text-md);
+}
+
+.admin-role-card ul {
+  margin: var(--space-3) 0 0;
+  padding-left: 1.1rem;
+  color: var(--text-2);
+  font-size: var(--text-md);
+  line-height: 1.7;
+}
+
+.admin-loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-8) 0;
+}
+
+.admin-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.admin-user .g-avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 12px;
+}
+
+.admin-user-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.admin-user-name {
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user-email {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-you {
+  margin-left: 6px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.admin-muted {
+  color: var(--text-3);
+}
+
+/* Desktop table */
+
+.admin-table-wrap {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-md);
+}
+
+.admin-table th {
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--text-3);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.admin-table td {
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.admin-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table tbody tr:hover {
+  background: var(--bg-subtle);
+}
+
+.admin-actions-cell {
+  width: 1%;
+  text-align: right;
+}
+
+/* Phone cards */
+
+.admin-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.admin-card-meta {
+  grid-column: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-left: calc(36px + var(--space-3));
+  color: var(--text-3);
+  font-size: var(--text-sm);
+}
+
+.admin-card-actions {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.admin-password-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.admin-password-row .g-input-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .admin-header-actions {
+    width: 100%;
+  }
+
+  .admin-header-actions .g-btn--primary {
+    flex: 1;
+  }
+}

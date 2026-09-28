@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist/types/src/display/api';
+import { Icon } from './ui/Icon';
 import './PDFPageSidebar.css';
 
 interface PDFPageSidebarProps {
@@ -9,6 +10,9 @@ interface PDFPageSidebarProps {
   numPages: number;
   currentPage: number;
   onGoToPage: (page: number) => void;
+  /** "drawer" slides over the canvas on phones; "docked" sits beside it. */
+  variant?: 'docked' | 'drawer';
+  onClose?: () => void;
 }
 
 interface CachedThumbnail {
@@ -169,23 +173,26 @@ const SidebarThumbnailInner: React.FC<SidebarThumbnailProps> = ({
   }, [active]);
 
   return (
-    <button
-      ref={buttonRef}
-      type="button"
-      className={`pdf-sidebar-thumbnail${active ? ' is-active' : ''}`}
-      onClick={handleClick}
-      title={`Page ${pageNumber}`}
-    >
-      <div className="pdf-sidebar-thumbnail-canvas-wrap">
-        <canvas ref={canvasRef} />
-        {renderState !== 'ready' && (
-          <span className="pdf-sidebar-thumbnail-state">
-            {renderState === 'error' ? 'Preview failed' : 'Rendering...'}
-          </span>
-        )}
-      </div>
-      <span className="pdf-sidebar-thumbnail-label">{pageNumber}</span>
-    </button>
+    <li className="pdf-sidebar-item">
+      <button
+        ref={buttonRef}
+        type="button"
+        className={`pdf-sidebar-thumbnail${active ? ' is-active' : ''}`}
+        onClick={handleClick}
+        aria-current={active ? 'page' : undefined}
+        aria-label={`Page ${pageNumber}`}
+      >
+        <span className="pdf-sidebar-thumbnail-canvas-wrap">
+          <canvas ref={canvasRef} aria-hidden="true" />
+          {renderState !== 'ready' && (
+            <span className="pdf-sidebar-thumbnail-state" aria-hidden="true">
+              {renderState === 'error' ? 'No preview' : <span className="g-spinner g-spinner--sm" />}
+            </span>
+          )}
+        </span>
+        <span className="pdf-sidebar-thumbnail-label" aria-hidden="true">{pageNumber}</span>
+      </button>
+    </li>
   );
 };
 
@@ -198,13 +205,37 @@ export const PDFPageSidebar: React.FC<PDFPageSidebarProps> = ({
   numPages,
   currentPage,
   onGoToPage,
+  variant = 'docked',
+  onClose,
 }) => {
   const pages = Array.from({ length: numPages }, (_, index) => index + 1);
+  const navRef = useRef<HTMLElement | null>(null);
+
+  // As a drawer, take focus to the current page so keyboard users land inside it.
+  useEffect(() => {
+    if (variant !== 'drawer') return;
+    const frame = requestAnimationFrame(() => {
+      navRef.current?.querySelector<HTMLButtonElement>('[aria-current="page"]')?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [variant]);
 
   return (
-    <aside className="pdf-page-sidebar" aria-label="Page thumbnails">
-      <div className="pdf-page-sidebar-header">Pages</div>
-      <div className="pdf-page-sidebar-list">
+    <nav
+      ref={navRef}
+      id="page-sidebar"
+      className={`pdf-page-sidebar pdf-page-sidebar--${variant}`}
+      aria-label="Pages"
+    >
+      <div className="pdf-page-sidebar-header">
+        <span>Pages <span className="pdf-page-sidebar-count">{numPages}</span></span>
+        {onClose && (
+          <button type="button" className="g-icon-btn g-icon-btn--sm" onClick={onClose} aria-label="Close pages">
+            <Icon name="x" size={16} />
+          </button>
+        )}
+      </div>
+      <ol className="pdf-page-sidebar-list">
         {pages.map((page) => (
           <SidebarThumbnail
             key={page}
@@ -216,7 +247,7 @@ export const PDFPageSidebar: React.FC<PDFPageSidebarProps> = ({
             onGoToPage={onGoToPage}
           />
         ))}
-      </div>
-    </aside>
+      </ol>
+    </nav>
   );
 };
