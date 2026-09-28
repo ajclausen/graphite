@@ -9,6 +9,15 @@ import pino from 'pino';
 import { PDFDocument, degrees as pdfDegrees } from 'pdf-lib';
 import type { Knex } from 'knex';
 import db from '../db/knex';
+import {
+  FILES_DIR,
+  THUMBNAIL_DIR,
+  DATA_DIR,
+  cleanupFile,
+  resolveWithin,
+  resolveDocumentFiles,
+  deleteDocumentRows,
+} from '../storage/documentStorage';
 
 const logger = pino({ name: 'documents' });
 
@@ -25,19 +34,6 @@ class UnsupportedFileTypeError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'UnsupportedFileTypeError';
-  }
-}
-
-/**
- * Safely remove an uploaded file, logging but not throwing on failure.
- */
-function cleanupFile(filePath: string): void {
-  try {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-  } catch (err) {
-    logger.error({ err, filePath }, 'Failed to clean up uploaded file');
   }
 }
 
@@ -144,13 +140,6 @@ function runUploadMiddleware(middleware: express.RequestHandler): express.Reques
 
 const router = express.Router();
 
-const DATA_DIR = process.env.DATA_DIR || './data';
-const FILES_DIR = path.join(DATA_DIR, 'pdfs');
-const THUMBNAIL_DIR = path.join(DATA_DIR, 'thumbnails');
-
-fs.mkdirSync(FILES_DIR, { recursive: true });
-fs.mkdirSync(THUMBNAIL_DIR, { recursive: true });
-
 // File upload via multer (PDFs and images)
 
 const fileStorage = multer.diskStorage({
@@ -200,15 +189,6 @@ const sourcePdfUpload = multer({
   },
   limits: { fileSize: 50 * 1024 * 1024 },
 });
-
-function resolveWithin(baseDir: string, relativePath: string): string | null {
-  const basePath = path.resolve(baseDir);
-  const resolved = path.resolve(basePath, relativePath);
-  if (!resolved.startsWith(`${basePath}${path.sep}`) && resolved !== basePath) {
-    return null;
-  }
-  return resolved;
-}
 
 function parsePageRange(value: string, pageCount: number): { pages: number[]; error?: string } {
   const tokens = value
@@ -466,7 +446,22 @@ router.get('/', async (req, res) => {
     const docs = await db('documents')
       .where({ user_id: userId })
       .orderBy('created_at', 'desc');
-    res.json(docs.map((doc) => serializeDocument(doc)));
+
+    // Annotation saves don't touch documents.updated_at (it doubles as a
+    // render-cache key for the file itself), so surface the latest activity
+    // separately for "recently edited" sorting in the library.
+    const annotationTimes = docs.length === 0 ? [] : await db('annotations')
+      .whereIn('document_id', docs.map((doc) => doc.id))
+      .groupBy('document_id')
+      .select('document_id')
+      .max({ last_annotated_at: 'updated_at' }) as Array<{ document_id: string; last_annotated_at: string | null }>;
+    const lastAnnotated = new Map(annotationTimes.map((row) => [row.document_id, row.last_annotated_at]));
+
+    res.json(docs.map((doc) => {
+      const annotatedAt = lastAnnotated.get(doc.id);
+      const lastEditedAt = annotatedAt && annotatedAt > doc.updated_at ? annotatedAt : doc.updated_at;
+      return { ...serializeDocument(doc), last_edited_at: lastEditedAt };
+    }));
   } catch (error) {
     logger.error('List error:', error);
     res.status(500).json({ error: 'Failed to list documents' });
@@ -1190,30 +1185,14 @@ router.delete('/:id', async (req, res): Promise<void> => {
       return;
     }
 
-    // Delete the stored file (PDF or image)
-    const filePath = resolveWithin(DATA_DIR, doc.file_path);
-    if (!filePath) {
+    const files = resolveDocumentFiles(doc);
+    if (!files) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
 
-    // Delete thumbnail if exists
-    if (doc.thumbnail_path) {
-      const thumbPath = resolveWithin(THUMBNAIL_DIR, path.basename(doc.thumbnail_path));
-      if (!thumbPath) {
-        res.status(403).json({ error: 'Access denied' });
-        return;
-      }
-      if (fs.existsSync(thumbPath)) {
-        fs.unlinkSync(thumbPath);
-      }
-    }
-
-    // Delete DB record (annotations cascade)
-    await db('documents').where({ id: req.params.id, user_id: req.session.userId }).del();
+    await deleteDocumentRows(db, { id: doc.id });
+    files.forEach(cleanupFile);
 
     res.status(204).send();
   } catch (error) {

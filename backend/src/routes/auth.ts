@@ -10,6 +10,7 @@ import db from '../db/knex';
 import { requireAuth, requireAdmin } from '../auth/middleware';
 import { ARGON2_OPTIONS, LOCKOUT_THRESHOLDS } from '../auth/config';
 import { toUserInfo } from '../auth/types';
+import { cleanupFile, deleteDocumentRows, resolveDocumentFiles } from '../storage/documentStorage';
 import type { UserRow } from '../auth/types';
 
 const router = express.Router();
@@ -431,7 +432,28 @@ router.delete('/admin/users/:id', requireAdmin, async (req, res): Promise<void> 
       return;
     }
 
-    await db('users').where({ id: targetId }).del();
+    // A deleted user's documents go with them: nobody else can see them
+    // (listing is scoped to user_id), so keeping them would only leave
+    // orphaned rows and files behind.
+    const ownedDocuments = await db('documents')
+      .where({ user_id: targetId })
+      .select('id', 'file_path', 'thumbnail_path') as Array<{ id: string; file_path: string; thumbnail_path: string | null }>;
+
+    await db.transaction(async (trx) => {
+      await deleteDocumentRows(trx, { user_id: targetId });
+      await trx('users').where({ id: targetId }).del();
+    });
+
+    // Remove files only after the rows are gone, so a failure above can't
+    // leave records pointing at missing files.
+    for (const doc of ownedDocuments) {
+      const files = resolveDocumentFiles(doc);
+      if (!files) {
+        logger.warn({ documentId: doc.id }, 'Skipped file cleanup for document with out-of-bounds path');
+        continue;
+      }
+      files.forEach(cleanupFile);
+    }
 
     // Destroy all sessions for deleted user
     const allSessions = await db('sessions').select('sid', 'sess') as Array<{ sid: string; sess: string }>;
@@ -445,7 +467,7 @@ router.delete('/admin/users/:id', requireAdmin, async (req, res): Promise<void> 
       } catch (_) { /* skip malformed session */ }
     }
 
-    logger.info({ targetId, adminId: req.user!.id }, 'Admin deleted user');
+    logger.info({ targetId, adminId: req.user!.id, deletedDocuments: ownedDocuments.length }, 'Admin deleted user');
     res.status(204).send();
   } catch (err) {
     logger.error(err, 'Delete user error');
