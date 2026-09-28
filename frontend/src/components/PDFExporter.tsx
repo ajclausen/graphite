@@ -4,6 +4,7 @@ import { exportToCanvas, exportToSvg, getCommonBounds } from '@excalidraw/excali
 import { pdfjs } from '../utils/pdfWorker';
 import { useAnnotationStore, flushPendingAnnotations } from '../store/annotationStore';
 import { getDocumentPdfUrl, getDocumentFileUrl } from '../api/client';
+import { toast } from '../store/uiStore';
 
 interface PDFExporterProps {
   documentId: string;
@@ -68,6 +69,7 @@ async function loadImageFromBlob(blob: Blob): Promise<HTMLImageElement> {
 
 export const PDFExporter: React.FC<PDFExporterProps> = ({ documentId, originalName, numPages, fileType }) => {
   const [isExporting, setIsExporting] = React.useState(false);
+  const [progress, setProgress] = React.useState<{ done: number; total: number } | null>(null);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -193,7 +195,7 @@ export const PDFExporter: React.FC<PDFExporterProps> = ({ documentId, originalNa
 
       const pdfBytes = await pdfDoc.save();
       triggerDownload(new Blob([pdfBytes], { type: 'application/pdf' }), `annotated_${baseName}.pdf`);
-      return;
+      return `annotated_${baseName}.pdf`;
     }
 
     const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
@@ -205,6 +207,7 @@ export const PDFExporter: React.FC<PDFExporterProps> = ({ documentId, originalNa
       throw new Error(`Failed to create ${format.toUpperCase()} export`);
     }
     triggerDownload(blob, `annotated_${baseName}.${format}`);
+    return `annotated_${baseName}.${format}`;
   }, [createImageExportCanvas, originalName]);
 
   const exportHighQualityPDF = async (format: ImageExportFormat = 'pdf') => {
@@ -214,7 +217,8 @@ export const PDFExporter: React.FC<PDFExporterProps> = ({ documentId, originalNa
       flushPendingAnnotations();
 
       if (fileType === 'image') {
-        await exportImageDocument(format);
+        const filename = await exportImageDocument(format);
+        toast.success('Export ready', filename);
         return;
       }
 
@@ -222,12 +226,17 @@ export const PDFExporter: React.FC<PDFExporterProps> = ({ documentId, originalNa
       // Fetch PDF bytes from server
       const pdfUrl = getDocumentPdfUrl(documentId);
       const response = await fetch(pdfUrl, { credentials: 'include' });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.status}`);
+      }
       const existingPdfBytes = await response.arrayBuffer();
 
       const pdfSource = await pdfjs.getDocument({ data: new Uint8Array(existingPdfBytes) }).promise;
       const pdfDoc = await PDFDocument.create();
 
+      setProgress({ done: 0, total: numPages });
       for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+        setProgress({ done: pageNum - 1, total: numPages });
         const sourcePage = await pdfSource.getPage(pageNum);
         const baseViewport = sourcePage.getViewport({ scale: 1 });
         const renderViewport = sourcePage.getViewport({ scale: EXPORT_SCALE });
@@ -309,13 +318,17 @@ export const PDFExporter: React.FC<PDFExporterProps> = ({ documentId, originalNa
         });
       }
 
+      void pdfSource.destroy();
       const pdfBytes = await pdfDoc.save();
-      triggerDownload(new Blob([pdfBytes], { type: 'application/pdf' }), `annotated_${originalName}`);
+      const filename = `annotated_${getExportBaseName(originalName)}.pdf`;
+      triggerDownload(new Blob([pdfBytes], { type: 'application/pdf' }), filename);
+      toast.success('Export ready', filename);
     } catch (error) {
       console.error('Error exporting PDF:', error);
-      alert('Error exporting PDF. Please try again.');
+      toast.error('Export failed', 'Something went wrong while building the file. Please try again.');
     } finally {
       setIsExporting(false);
+      setProgress(null);
     }
   };
 
@@ -329,7 +342,7 @@ export const PDFExporter: React.FC<PDFExporterProps> = ({ documentId, originalNa
           aria-haspopup="menu"
           aria-expanded={menuOpen}
         >
-          {isExporting ? 'Exporting...' : 'Export'}
+          {isExporting ? 'Exporting…' : 'Export'}
         </button>
         {menuOpen && !isExporting && (
           <div className="export-menu-dropdown" role="menu">
@@ -348,13 +361,19 @@ export const PDFExporter: React.FC<PDFExporterProps> = ({ documentId, originalNa
     );
   }
 
+  const exportingLabel = progress && progress.total > 1
+    ? `Exporting ${Math.min(progress.done + 1, progress.total)}/${progress.total}…`
+    : 'Exporting…';
+
   return (
     <button
       className="export-btn"
       onClick={() => exportHighQualityPDF('pdf')}
       disabled={isExporting}
+      title="Download a flattened PDF with your annotations"
+      aria-live="polite"
     >
-      {isExporting ? 'Exporting...' : 'Export PDF'}
+      {isExporting ? exportingLabel : 'Export PDF'}
     </button>
   );
 };

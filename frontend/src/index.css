@@ -124,3 +124,38 @@ button {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(128, 128, 128, 0.35);
 }
+
+/* Keyboard focus: visible for keyboard users, invisible for mouse clicks */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--g-amber);
+  outline-offset: 2px;
+}
+
+/* Excalidraw draws its own focus treatment */
+.excalidraw :focus-visible {
+  outline: revert;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Screen-reader-only text */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

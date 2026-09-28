@@ -11,6 +11,8 @@ export interface Document {
   mime_type: string | null;
   created_at: string;
   updated_at: string;
+  /** Latest of file change or annotation save. Only present on list results. */
+  last_edited_at?: string;
 }
 
 export interface AnnotationRecord {

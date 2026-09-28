@@ -261,10 +261,74 @@
 
 /* ─── Admin page ──────────────────────────────────────────────────────────── */
 
+/* ─── Admin page layout ──────────────────────────────────────────────────── */
+
+.admin-page {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem 1.5rem 3rem;
+}
+
+.admin-page-inner {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.admin-title {
+  margin: 0;
+  font-family: var(--g-font-display);
+  font-size: 1.75rem;
+  font-weight: 400;
+  color: var(--g-text);
+}
+
+.admin-count {
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: var(--g-surface-hover);
+  color: var(--g-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.admin-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-header-right .g-btn--ghost.is-active {
+  background: var(--g-surface-hover);
+  color: var(--g-text);
+}
+
+.admin-loading {
+  display: flex;
+  justify-content: center;
+  padding: 3rem 0;
+}
+
+.admin-you {
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--g-surface-hover);
+  color: var(--g-text-tertiary);
+  font-size: 0.68rem;
+  font-weight: 500;
+  vertical-align: 1px;
+}
+
+.admin-muted {
+  color: var(--g-text-tertiary);
+}
+
 .admin-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   margin-bottom: 1.5rem;
 }
 
@@ -421,6 +485,9 @@
 
 .admin-table-wrapper {
   overflow: visible;
+  border: 1px solid var(--g-border);
+  border-radius: var(--g-radius);
+  background: var(--g-surface);
 }
 
 .admin-table {
@@ -617,8 +684,12 @@
     flex-direction: column;
   }
 
-  .admin-form-row .admin-toolbar-btn {
+  .admin-form-row .g-btn {
     width: 100%;
+  }
+
+  .admin-page {
+    padding: 1.25rem 1rem 2rem;
   }
 
   .admin-table-wrapper {

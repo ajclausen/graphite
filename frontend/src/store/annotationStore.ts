@@ -55,6 +55,11 @@ let _pending: { pageNumber: number; elements: readonly ExcalidrawElement[] } | n
 let _commitTimer: ReturnType<typeof setTimeout> | null = null;
 const PENDING_COMMIT_DELAY_MS = 300;
 
+// How long to wait after the last change before saving a page. Short enough
+// that "Saved" shows up while you're still looking, long enough to batch a
+// burst of strokes into one request.
+const SAVE_DEBOUNCE_MS = 1500;
+
 // Per-page auto-save debounce timers
 const _saveTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
@@ -77,7 +82,12 @@ function scheduleSave(pageNumber: number) {
     const elements = state.annotations[pageNumber];
     if (!elements) return;
 
-    if (_savingPages.has(pageNumber)) return;
+    // A save for this page is still in flight: try again shortly rather than
+    // dropping these changes on the floor.
+    if (_savingPages.has(pageNumber)) {
+      scheduleSave(pageNumber);
+      return;
+    }
     _savingPages.add(pageNumber);
 
     useAnnotationStore.setState({ saveStatus: 'saving' });
@@ -105,7 +115,7 @@ function scheduleSave(pageNumber: number) {
     } finally {
       _savingPages.delete(pageNumber);
     }
-  }, 5000);
+  }, SAVE_DEBOUNCE_MS);
 
   _saveTimers.set(pageNumber, timer);
 }

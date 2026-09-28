@@ -157,9 +157,9 @@ Graphite uses an admin-managed user model. There is no self-registration — the
 
 ### Admin panel
 
-Admins can access user management from the **Admin** button in the app header. From there you can:
+Admins can open user management from the account menu in the top-right corner (**Manage users**). From there you can:
 
-- Create and delete user accounts
+- Create and delete user accounts (deleting a user also deletes their documents)
 - Promote users to admin or demote admins
 - Reset any user's password
 - Change your own password

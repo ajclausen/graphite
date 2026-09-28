@@ -11,6 +11,8 @@ import {
 } from '../api/client';
 import type { Document } from '../api/client';
 import { useAnnotationStore } from '../store/annotationStore';
+import { confirmDialog, toast, errorMessage } from '../store/uiStore';
+import { pluralize } from '../utils/format';
 import { pdfjs } from '../utils/pdfWorker';
 import { PDF_DOCUMENT_OPTIONS } from '../utils/pdfOptions';
 import './PDFPageManager.css';
@@ -323,12 +325,34 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
     setLastSelectedPage(pageNumber);
   }, []);
 
-  const handleClose = useCallback(() => {
-    if (orderDirty && !confirm('Discard unsaved page order changes?')) {
-      return;
+  const handleClose = useCallback(async () => {
+    if (orderDirty) {
+      const discard = await confirmDialog({
+        title: 'Discard page order changes?',
+        message: 'You’ve rearranged pages but haven’t saved the new order.',
+        confirmLabel: 'Discard',
+        cancelLabel: 'Keep editing',
+        danger: true,
+      });
+      if (!discard) return;
     }
     onClose();
   }, [onClose, orderDirty]);
+
+  // Escape closes the manager (or the append dialog first, if it's open).
+  // Shared confirm dialogs handle their own Escape in the capture phase.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || working) return;
+      if (sourcePdfImport) {
+        setSourcePdfImport(null);
+        return;
+      }
+      void handleClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleClose, sourcePdfImport, working]);
 
   const handleThumbnailClick = useCallback((pageNumber: number, event: React.MouseEvent<HTMLButtonElement>) => {
     setSelectedPages((current) => {
@@ -482,9 +506,10 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
       const nextPage = Math.min(Math.max(1, result.pageNumber), result.document.page_count || numPages);
       setSingleSelection(nextPage);
       onDocumentUpdated(result.document, nextPage);
+      toast.success('Page order saved');
     } catch (error) {
       console.error('Failed to save page order:', error);
-      alert('Failed to save page order');
+      toast.error('Couldn’t save page order', errorMessage(error, 'Please try again.'));
     } finally {
       setWorking(null);
     }
@@ -505,7 +530,7 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
       onDocumentUpdated(result.document, result.pageNumber);
     } catch (error) {
       console.error('Failed to insert page:', error);
-      alert('Failed to insert page');
+      toast.error('Couldn’t insert page', errorMessage(error, 'Please try again.'));
     } finally {
       setWorking(null);
     }
@@ -514,13 +539,17 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
   const handleDeletePages = useCallback(async () => {
     if (actionDisabled) return;
     if (selectedOrdered.length >= numPages) {
-      alert('A PDF must keep at least one page.');
+      toast.info('A PDF needs at least one page', 'Deselect a page to keep before deleting.');
       return;
     }
 
-    if (!confirm(`Delete ${selectedOrdered.length} selected ${selectedOrdered.length === 1 ? 'page' : 'pages'}? Annotations on those pages will also be deleted.`)) {
-      return;
-    }
+    const confirmed = await confirmDialog({
+      title: `Delete ${pluralize(selectedOrdered.length, 'page')}?`,
+      message: 'Annotations on these pages will be deleted too. This can’t be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
 
     setWorking('Deleting pages');
     try {
@@ -528,9 +557,10 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
       const result = await deletePdfPages(doc.id, selectedOrdered);
       setSingleSelection(result.pageNumber);
       onDocumentUpdated(result.document, result.pageNumber);
+      toast.success(`Deleted ${pluralize(selectedOrdered.length, 'page')}`);
     } catch (error) {
       console.error('Failed to delete pages:', error);
-      alert('Failed to delete pages');
+      toast.error('Couldn’t delete pages', errorMessage(error, 'Please try again.'));
     } finally {
       setWorking(null);
     }
@@ -548,7 +578,7 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
       onDocumentUpdated(result.document, nextPage);
     } catch (error) {
       console.error('Failed to rotate pages:', error);
-      alert('Failed to rotate pages');
+      toast.error('Couldn’t rotate pages', errorMessage(error, 'Please try again.'));
     } finally {
       setWorking(null);
     }
@@ -567,7 +597,7 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
       onDocumentUpdated(result.document, result.pageNumber);
     } catch (error) {
       console.error('Failed to duplicate pages:', error);
-      alert('Failed to duplicate pages');
+      toast.error('Couldn’t duplicate pages', errorMessage(error, 'Please try again.'));
     } finally {
       setWorking(null);
     }
@@ -576,19 +606,22 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
   const handleExtractPages = useCallback(async () => {
     if (actionDisabled) return;
 
-    if (!confirm(`Extract ${selectedOrdered.length} selected ${selectedOrdered.length === 1 ? 'page' : 'pages'} into a new PDF?`)) {
-      return;
-    }
+    const confirmed = await confirmDialog({
+      title: `Extract ${pluralize(selectedOrdered.length, 'page')} to a new PDF?`,
+      message: 'A copy of the selected pages is added to your library. This document stays unchanged.',
+      confirmLabel: 'Extract',
+    });
+    if (!confirmed) return;
 
     setWorking('Extracting pages');
     try {
       await useAnnotationStore.getState().flushAllPendingSaves();
       const result = await extractPdfPages(doc.id, selectedOrdered);
       onDocumentCreated?.(result.document);
-      alert(`Created ${result.document.original_name}`);
+      toast.success(`Created ${result.document.original_name}`, 'Find it in your library or the document switcher.');
     } catch (error) {
       console.error('Failed to extract pages:', error);
-      alert('Failed to extract pages');
+      toast.error('Couldn’t extract pages', errorMessage(error, 'Please try again.'));
     } finally {
       setWorking(null);
     }
@@ -600,7 +633,7 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
 
     if (!file) return;
     if (file.type !== 'application/pdf') {
-      alert('Please choose a PDF file');
+      toast.error('Only PDF files can be appended', `${file.name} isn’t a PDF.`);
       return;
     }
 
@@ -616,7 +649,7 @@ export const PDFPageManager: React.FC<PDFPageManagerProps> = ({
       });
     } catch (error) {
       console.error('Failed to inspect source PDF:', error);
-      alert('Failed to read PDF pages');
+      toast.error(`Couldn’t read ${file.name}`, 'The file may be damaged or password-protected.');
     } finally {
       setWorking(null);
     }

@@ -6,16 +6,13 @@ import {
   deleteUser,
   updateUser,
   resetUserPassword,
-  changePassword as apiChangePassword,
 } from '../api/client';
 import { useAuthStore } from '../store/authStore';
+import { confirmDialog, toast, errorMessage } from '../store/uiStore';
+import { ChangePasswordModal } from './ChangePasswordModal';
 import './AuthPages.css';
 
-interface AdminPageProps {
-  onBack: () => void;
-}
-
-export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
+export const AdminPage: React.FC = () => {
   const [users, setUsers] = useState<UserInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -41,12 +38,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
 
   // Change own password modal
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [currentPw, setCurrentPw] = useState('');
-  const [newPw, setNewPw] = useState('');
-  const [confirmPw, setConfirmPw] = useState('');
-  const [changePwError, setChangePwError] = useState('');
-  const [changePwSuccess, setChangePwSuccess] = useState(false);
-  const [changingPw, setChangingPw] = useState(false);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -102,6 +93,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
     setCreating(true);
     try {
       await createUser(newEmail, newPassword, newDisplayName || undefined, newRole);
+      toast.success(`Added ${newEmail}`, 'They’ll be asked to choose a new password when they first sign in.');
       setShowCreate(false);
       setNewEmail('');
       setNewPassword('');
@@ -117,12 +109,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
 
   const handleDeleteUser = async (user: UserInfo) => {
     setMenuUserId(null);
-    if (!confirm(`Delete user "${user.email}"? This cannot be undone.`)) return;
+    const confirmed = await confirmDialog({
+      title: 'Delete this user?',
+      message: `${user.email} will be signed out immediately, and all of their documents and annotations will be permanently deleted. This can’t be undone.`,
+      confirmLabel: 'Delete user',
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await deleteUser(user.id);
+      toast.success(`Deleted ${user.email}`, 'Their documents were removed too.');
       await loadUsers();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete user');
+      toast.error('Couldn’t delete user', errorMessage(err, 'Please try again.'));
     }
   };
 
@@ -131,9 +130,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
     const newRole = user.role === 'admin' ? 'user' : 'admin';
     try {
       await updateUser(user.id, { role: newRole });
+      toast.success(newRole === 'admin' ? `${user.email} is now an admin` : `${user.email} is now a regular user`);
       await loadUsers();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update user role');
+      toast.error('Couldn’t change role', errorMessage(err, 'Please try again.'));
     }
   };
 
@@ -150,6 +150,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
     setResetting(true);
     try {
       await resetUserPassword(resetUserId, resetPassword);
+      const email = users.find((u) => u.id === resetUserId)?.email;
+      toast.success('Password reset', email ? `${email} will choose a new one at next sign-in.` : undefined);
       setResetUserId(null);
       setResetPasswordValue('');
     } catch (err) {
@@ -159,73 +161,42 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
     }
   };
 
-  const handleChangeOwnPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setChangePwError('');
-    setChangePwSuccess(false);
-
-    if (newPw !== confirmPw) {
-      setChangePwError('New passwords do not match');
-      return;
-    }
-    if (newPw.length < 8) {
-      setChangePwError('New password must be at least 8 characters');
-      return;
-    }
-
-    setChangingPw(true);
-    try {
-      const { user } = await apiChangePassword(currentPw, newPw);
-      useAuthStore.setState({ user });
-      setChangePwSuccess(true);
-      setCurrentPw('');
-      setNewPw('');
-      setConfirmPw('');
-    } catch (err) {
-      setChangePwError(err instanceof Error ? err.message : 'Failed to change password');
-    } finally {
-      setChangingPw(false);
-    }
-  };
-
-  const closeChangePassword = () => {
-    setMenuUserId(null);
-    setShowChangePassword(false);
-    setCurrentPw('');
-    setNewPw('');
-    setConfirmPw('');
-    setChangePwError('');
-    setChangePwSuccess(false);
-  };
-
-  if (loading) {
-    return (
-      <div className="auth-page">
-        <div className="auth-card auth-card--wide">
-          <p className="auth-description">Loading users...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="auth-page">
-      <div className="auth-card auth-card--wide">
+    <div className="admin-page">
+      <div className="admin-page-inner">
         <div className="admin-header">
           <div className="admin-header-left">
-            <h2 className="auth-title">User management</h2>
+            <h2 className="admin-title">Users</h2>
+            {!loading && <span className="admin-count">{users.length}</span>}
+          </div>
+          <div className="admin-header-right">
             <button
-              className="admin-info-btn"
+              className={`g-btn g-btn--ghost${showRoleInfo ? ' is-active' : ''}`}
               onClick={() => setShowRoleInfo(!showRoleInfo)}
-              title="Role permissions info"
-              aria-label="Role permissions info"
+              aria-expanded={showRoleInfo}
             >
-              i
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <line x1="12" y1="11" x2="12" y2="16" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+              Roles
+            </button>
+            <button
+              className={`g-btn ${showCreate ? 'g-btn--secondary' : 'g-btn--primary'}`}
+              onClick={() => setShowCreate(!showCreate)}
+            >
+              {showCreate ? 'Cancel' : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  Add user
+                </>
+              )}
             </button>
           </div>
-          <button className="auth-link" onClick={onBack}>
-            Back to app
-          </button>
         </div>
 
         {showRoleInfo && (
@@ -250,7 +221,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
                   <li>Create and manage user accounts</li>
                   <li>Reset passwords for any user</li>
                   <li>Promote users to admin or demote admins</li>
-                  <li>Delete user accounts</li>
+                  <li>Delete user accounts (and their documents)</li>
                 </ul>
               </div>
               <div className="admin-info-column">
@@ -272,15 +243,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
         )}
 
         {error && <div className="auth-error">{error}</div>}
-
-        <div className="admin-toolbar">
-          <button
-            className="admin-toolbar-btn"
-            onClick={() => setShowCreate(!showCreate)}
-          >
-            {showCreate ? 'Cancel' : '+ Add user'}
-          </button>
-        </div>
 
         {showCreate && (
           <form className="auth-form admin-create-form" onSubmit={handleCreateUser}>
@@ -322,14 +284,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
               </select>
-              <button className="admin-toolbar-btn" type="submit" disabled={creating}>
-                {creating ? 'Creating...' : 'Create'}
+              <button className="g-btn g-btn--primary" type="submit" disabled={creating}>
+                {creating ? 'Creating…' : 'Create user'}
               </button>
             </div>
           </form>
         )}
 
         <div className="admin-table-wrapper">
+          {loading ? (
+            <div className="admin-loading"><div className="g-spinner" /></div>
+          ) : (
           <table className="admin-table">
             <thead>
               <tr>
@@ -343,14 +308,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
             <tbody>
               {users.map((user) => (
                 <tr key={user.id}>
-                  <td>{user.email}</td>
-                  <td>{user.displayName || '-'}</td>
+                  <td>
+                    {user.email}
+                    {user.id === currentUser?.id && <span className="admin-you">you</span>}
+                  </td>
+                  <td>{user.displayName || <span className="admin-muted">—</span>}</td>
                   <td>
                     <span className={`admin-role-badge admin-role-badge--${user.role}`}>
                       {user.role}
                     </span>
                   </td>
-                  <td>{new Date(user.createdAt).toLocaleDateString()}</td>
+                  <td>{new Date(user.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</td>
                   <td className="admin-actions-cell">
                     <div
                       className="admin-actions-menu"
@@ -415,6 +383,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
               ))}
             </tbody>
           </table>
+          )}
         </div>
 
         {/* Reset password modal (for other users) */}
@@ -464,73 +433,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
           </div>
         )}
 
-        {/* Change own password modal */}
-        {showChangePassword && (
-          <div
-            className="auth-modal-backdrop"
-            onClick={() => { if (!changingPw) closeChangePassword(); }}
-          >
-            <div className="auth-card" onClick={(e) => e.stopPropagation()}>
-              <h2 className="auth-title">Change your password</h2>
-              <form className="auth-form" onSubmit={handleChangeOwnPassword}>
-                {changePwError && <div className="auth-error">{changePwError}</div>}
-                {changePwSuccess && <div className="auth-success">Password changed successfully.</div>}
-                <label className="auth-label">
-                  Current password
-                  <input
-                    className="auth-input"
-                    type="password"
-                    value={currentPw}
-                    onChange={(e) => setCurrentPw(e.target.value)}
-                    placeholder="Enter current password"
-                    required
-                    autoFocus
-                    autoComplete="current-password"
-                  />
-                </label>
-                <label className="auth-label">
-                  New password
-                  <input
-                    className="auth-input"
-                    type="password"
-                    value={newPw}
-                    onChange={(e) => setNewPw(e.target.value)}
-                    placeholder="At least 8 characters"
-                    required
-                    minLength={8}
-                    autoComplete="new-password"
-                  />
-                </label>
-                <label className="auth-label">
-                  Confirm new password
-                  <input
-                    className="auth-input"
-                    type="password"
-                    value={confirmPw}
-                    onChange={(e) => setConfirmPw(e.target.value)}
-                    placeholder="Re-enter new password"
-                    required
-                    minLength={8}
-                    autoComplete="new-password"
-                  />
-                </label>
-                <div className="admin-modal-actions">
-                  <button
-                    type="button"
-                    className="auth-link"
-                    onClick={closeChangePassword}
-                    disabled={changingPw}
-                  >
-                    Cancel
-                  </button>
-                  <button className="admin-toolbar-btn" type="submit" disabled={changingPw}>
-                    {changingPw ? 'Changing...' : 'Change password'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
       </div>
     </div>
   );

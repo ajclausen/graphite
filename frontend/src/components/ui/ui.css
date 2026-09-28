@@ -1,0 +1,374 @@
+/* ── Shared UI primitives (buttons, modals, toasts, spinners, menus) ── */
+
+/* Buttons */
+
+.g-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: none;
+  border-radius: 8px;
+  padding: 0.55rem 1rem;
+  font-family: var(--g-font-body);
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, opacity 0.15s ease, color 0.15s ease;
+}
+
+.g-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.g-btn--primary {
+  background: var(--g-amber);
+  color: #fff;
+}
+
+.g-btn--primary:hover:not(:disabled) {
+  background: var(--g-amber-hover);
+}
+
+.g-btn--secondary {
+  background: var(--g-surface-hover);
+  color: var(--g-text);
+}
+
+.g-btn--secondary:hover:not(:disabled) {
+  background: var(--g-surface-active);
+}
+
+.g-btn--ghost {
+  background: transparent;
+  color: var(--g-text-secondary);
+}
+
+.g-btn--ghost:hover:not(:disabled) {
+  background: var(--g-surface-hover);
+  color: var(--g-text);
+}
+
+.g-btn--danger {
+  background: var(--g-danger);
+  color: #fff;
+}
+
+.g-btn--danger:hover:not(:disabled) {
+  filter: brightness(0.93);
+}
+
+/* Modal */
+
+.g-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--g-overlay-bg);
+  backdrop-filter: blur(8px);
+  animation: g-fade-in 0.15s ease;
+}
+
+.g-modal {
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+  padding: 1.5rem;
+  border: 1px solid var(--g-border);
+  border-radius: var(--g-radius-lg);
+  background: var(--g-surface);
+  box-shadow: var(--g-shadow-lg);
+  color: var(--g-text);
+  font-family: var(--g-font-body);
+  animation: g-pop-in 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  outline: none;
+}
+
+.g-modal-title {
+  margin: 0;
+  font-family: var(--g-font-display);
+  font-size: 1.3rem;
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.g-modal-description {
+  margin: 0.4rem 0 0;
+  color: var(--g-text-secondary);
+  font-size: 0.88rem;
+  font-weight: 300;
+  line-height: 1.5;
+}
+
+.g-modal-description strong {
+  color: var(--g-text);
+  font-weight: 500;
+}
+
+.g-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.4rem;
+}
+
+/* Form fields used inside modals */
+
+.g-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-top: 1.15rem;
+}
+
+.g-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--g-text-secondary);
+}
+
+.g-input {
+  width: 100%;
+  border: 1px solid var(--g-border);
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+  background: var(--g-bg);
+  color: var(--g-text);
+  font-family: var(--g-font-body);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.g-input:focus {
+  border-color: var(--g-amber);
+  box-shadow: 0 0 0 3px var(--g-amber-glow);
+}
+
+.g-form-error {
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  background: var(--g-danger-bg);
+  color: var(--g-danger);
+  font-size: 0.82rem;
+}
+
+/* Toasts */
+
+.g-toaster {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  pointer-events: none;
+}
+
+.g-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  min-width: 240px;
+  max-width: 440px;
+  padding: 0.7rem 0.7rem 0.7rem 0.9rem;
+  border: 1px solid var(--g-border);
+  border-radius: 10px;
+  background: var(--g-surface);
+  box-shadow: var(--g-shadow-lg);
+  color: var(--g-text);
+  font-family: var(--g-font-body);
+  font-size: 0.85rem;
+  pointer-events: auto;
+  animation: g-toast-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+
+.g-toast-icon {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.g-toast--success .g-toast-icon { color: var(--g-success); }
+.g-toast--error .g-toast-icon { color: var(--g-danger); }
+.g-toast--info .g-toast-icon { color: var(--g-amber); }
+
+.g-toast--error {
+  border-color: color-mix(in srgb, var(--g-danger) 35%, transparent);
+}
+
+.g-toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.g-toast-message {
+  line-height: 1.35;
+}
+
+.g-toast-description {
+  margin-top: 0.15rem;
+  color: var(--g-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 300;
+  overflow-wrap: anywhere;
+}
+
+.g-toast-close {
+  flex-shrink: 0;
+  display: flex;
+  padding: 0.25rem;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--g-text-tertiary);
+  cursor: pointer;
+}
+
+.g-toast-close:hover {
+  color: var(--g-text);
+  background: var(--g-surface-hover);
+}
+
+/* Spinner */
+
+.g-spinner {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid var(--g-border);
+  border-top-color: var(--g-amber);
+  border-radius: 50%;
+  animation: g-spin 0.7s linear infinite;
+}
+
+.g-spinner--sm {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+}
+
+/* Dropdown menu (account menu, etc.) */
+
+.g-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 200;
+  min-width: 220px;
+  padding: 0.35rem;
+  border: 1px solid var(--g-border);
+  border-radius: var(--g-radius);
+  background: var(--g-surface);
+  box-shadow: var(--g-shadow-lg);
+  animation: g-pop-in 0.14s ease;
+}
+
+.g-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--g-text);
+  font-family: var(--g-font-body);
+  font-size: 0.84rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.g-menu-item svg {
+  flex-shrink: 0;
+  color: var(--g-text-secondary);
+}
+
+.g-menu-item:hover,
+.g-menu-item:focus-visible {
+  background: var(--g-surface-hover);
+  outline: none;
+}
+
+.g-menu-item--danger,
+.g-menu-item--danger svg {
+  color: var(--g-danger);
+}
+
+.g-menu-divider {
+  height: 1px;
+  margin: 0.3rem 0.2rem;
+  background: var(--g-border);
+}
+
+.g-menu-header {
+  padding: 0.55rem 0.65rem 0.6rem;
+  min-width: 0;
+}
+
+.g-menu-header-name {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--g-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.g-menu-header-sub {
+  font-size: 0.76rem;
+  color: var(--g-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Keyboard hint chip */
+
+.g-kbd {
+  display: inline-block;
+  min-width: 1.3em;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--g-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--g-bg);
+  color: var(--g-text-secondary);
+  font-family: var(--g-font-body);
+  font-size: 0.7rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+@keyframes g-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes g-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes g-pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes g-toast-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}

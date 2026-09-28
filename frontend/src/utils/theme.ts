@@ -2,7 +2,10 @@ const STORAGE_KEY = 'graphite-theme';
 export type Theme = 'light' | 'dark';
 
 export function getStoredTheme(): Theme {
-  return (localStorage.getItem(STORAGE_KEY) as Theme) || 'dark';
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored === 'light' || stored === 'dark') return stored;
+  // First visit: follow the OS preference.
+  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 
 export function applyTheme(theme: Theme): void {

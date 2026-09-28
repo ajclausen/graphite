@@ -122,3 +122,9 @@
   background: var(--g-toolbar-btn-hover) !important;
   color: var(--g-toolbar-text-hover) !important;
 }
+
+@media (max-width: 760px) {
+  .pdf-page-sidebar {
+    width: 120px;
+  }
+}
